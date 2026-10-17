@@ -3,7 +3,7 @@
 import from react { useEffect }
 import from "@jac/runtime" { useLocation }
 import from .i18n { t, tf }
-import from .ui { Header, Card, Badge, theme, rows, first_report, query_param }
+import from .ui { Header, Card, Badge, theme, rows, last_report, query_param }
 import from .phone { PhoneFrame }
 
 sv import from ..walkers.api { get_guardian, guardian_answer, set_language }
@@ -57,7 +57,7 @@ def:pub GuardianScreen() -> JsxElement {
     guardian_id = query_param(useLocation().search as str, "id") or "g_dilshan";
 
     async def load() {
-        fresh = first_report(root spawn get_guardian(guardian_id=guardian_id));
+        fresh = last_report(root spawn get_guardian(guardian_id=guardian_id));
         if fresh {
             data = fresh;
             if not lang_set {

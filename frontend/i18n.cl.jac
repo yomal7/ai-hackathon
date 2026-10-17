@@ -48,6 +48,12 @@ glob EN: dict[str, str] = {
     "form.summary": "You are sending {amount} to {payee}.",
     "form.account_hint": "e.g. LDB-77821",
     "result.back_home": "Back to home",
+    "phone.msg.scam_breaker": "Please answer a few short questions. We are checking this together with you.",
+    "phone.msg.held": "We paused this transfer for a short safety check. Your money is safe.",
+    "phone.msg.blocked_protected": "Stopped. Your family confirmed this was a scam. Your savings are safe.",
+    "phone.msg.blocked": "This transfer was stopped to protect your savings.",
+    "phone.msg.step_up": "We need one more check before this transfer can go.",
+    "phone.msg.done": "Your money was sent.",
     "transfer.continue": "Continue",
     "transfer.confirm": "Confirm and send",
     "transfer.checking": "Checking your request…",
@@ -146,6 +152,35 @@ glob EN: dict[str, str] = {
     "war.timeline": "Timeline",
     "war.people_saw": "What people saw",
     "war.pressure": "Pressure meter",
+    "war.nobody_yet": "Nothing was shown to people yet.",
+    "war.deadlock_title": "Council deadlock - both sides",
+    "war.side_stop": "Wants to stop it",
+    "war.side_go": "Wants to let it go",
+    "war.no_lockout": "We protect elders without locking them out of their own money.",
+    "war.normal_vs": "Normal security vs Rakshaka",
+    "war.rakshaka_sees": "Also reads the pressure, the routine and the mule ring.",
+    "war.owner_coerced": "Password and OTP are right - the owner himself is being pushed by a scammer.",
+    "war.no_signals": "No signals between banks yet.",
+    "war.hop": "hop",
+    "walk.MULE_RING": "Mule Ring walk",
+    "walk.MONEY_TRACE": "Money Tracer follows the money",
+    "signal.ACCOUNT_FLAGGED": "Account flagged",
+    "signal.FREEZE_REQUEST": "Freeze request",
+    "signal.SESSION_REVOKED": "Session revoked",
+    "action.BILL_PAY": "Bill payment",
+    "action.TRANSFER": "Transfer",
+    "action.BREAK_FD": "FD break",
+    "action.LOGIN": "Login",
+    "status.DRAFT": "DRAFT",
+    "status.CHECKING": "CHECKING",
+    "status.ALLOWED": "ALLOWED",
+    "status.STEP_UP": "STEP-UP",
+    "status.HELD": "HELD",
+    "status.BLOCKED": "BLOCKED",
+    "agent.SYSTEM": "System",
+    "agent.GUARDIAN": "Guardian",
+    "agent.ANALYST": "Analyst",
+    "tele.step": "{name}: step {n} of {total}",
     "war.system1": "System 1",
     "war.system2": "System 2",
     "war.rule_src": "Rule",
@@ -220,6 +255,11 @@ def:pub t(key: str, lang: str) -> str {
     }
     console.warn("[i18n] unknown key " + key);
     return key;
+}
+
+"""True if English text exists for this key (for names that come from the server, like timeline agents)."""
+def:pub known_key(key: str) -> bool {
+    return key in EN;
 }
 
 """t() with {name} style values filled in."""

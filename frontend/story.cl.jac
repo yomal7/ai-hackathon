@@ -1,7 +1,7 @@
 # Story screen (C): B's debrief in the chosen language + timeline (English). Final counters come in M5.
 import from react { useEffect }
 import from .i18n { t }
-import from .ui { Header, Card, theme, rows, first_report }
+import from .ui { Header, Card, theme, rows, last_report }
 
 sv import from ..walkers.api { get_story }
 
@@ -12,7 +12,7 @@ def:pub Story() -> JsxElement {
         lang: str = "en";
 
     async def load() {
-        fresh = first_report(root spawn get_story(language=lang));
+        fresh = last_report(root spawn get_story(language=lang));
         if fresh {
             data = fresh;
         }
