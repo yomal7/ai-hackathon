@@ -1,8 +1,9 @@
-"""Graph edges — names FIXED by the shared plan (section 4).
-Endpoint types (Src --> Tgt) let the type checker know what a traversal returns.
-TEMPORARY COPY written by Person B (branch b-ai). Person A owns this file."""
-
-import from graph.nodes { Bank, Citizen, Device, Place, Habit, Account, Request, Ruling, PressureReading, ScamCheck, ScamPattern, Guardian }
+# Graph edges - every edge from section 4 with the FIXED names (A)
+# Edges with several source types start from RNode (the base of every node).
+import from graph.nodes {
+    RNode, Bank, Citizen, Device, Place, Habit, Account, Request, PressureReading,
+    Proposal, Ruling, ScamCheck, ScamPattern, Signal, Alert, Guardian
+}
 
 edge AccountAt: Account --> Bank {}
 edge Owns: Citizen --> Account {}
@@ -14,17 +15,19 @@ edge From: Request --> Device {}
 edge At: Request --> Place {}
 edge PaysTo: Request --> Account {}
 
-# Money flow — Mule Ring and Money Tracer walk these.
+"""Money flow. Mule Ring and Money Tracer walk these."""
 edge Paid: Account --> Account {
-    has amount: float = 0.0, time: str = "";
+    has amount: int = 0;
+    has time: str = "";              # demo clock "HH:MM"
+    has days_ago: int = 0;           # extra: 0 = today
 }
 
-edge HasProposal {}     # Request | Account -> Proposal
+edge HasProposal: RNode --> Proposal {}      # Request | Account -> Proposal
 edge Decided: Request --> Ruling {}
 edge Read: Request --> PressureReading {}
 edge Checked: Request --> ScamCheck {}
 edge Matched: Request --> ScamPattern {}
 edge LearnedFrom: ScamPattern --> Request {}
-edge Emitted {}         # Ruling | Account -> Signal
+edge Emitted: RNode --> Signal {}            # Ruling | Account -> Signal
 edge ProtectedBy: Citizen --> Guardian {}
-edge Raised {}          # Request | Signal -> Alert
+edge Raised: RNode --> Alert {}              # Request | Signal -> Alert

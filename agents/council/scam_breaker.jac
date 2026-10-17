@@ -5,7 +5,7 @@ Walkers: ScamBreakerStart (spawned by A on HOLD + pressure >= 70),
          ScamAnswer (spawned by C's scam_answer API)."""
 
 import time;
-import from graph.nodes { Request, ScamCheck, Proposal, Citizen, Guardian, Alert }
+import from graph.nodes { Request, ScamCheck, Proposal, Citizen, Guardian, Alert, AgentName, Scope, Stance, JevReading, Lang }
 import from graph.edges { Made, Checked, HasProposal, ProtectedBy, Raised }
 import from ai.jev { jev_read_reply, jev_last }
 import from ai.llm_calls { scam_questions }
@@ -66,7 +66,7 @@ def answers_proposal(req: Request, checks: list[ScamCheck], ms: int, source: str
         confidence = 0.5;
         reason = f"{name}'s replies are unclear; ask for one extra check.";
     }
-    return Proposal(agent="SCAM_BREAKER", scope="REQUEST", stance=stance, confidence=round2(confidence),
+    return Proposal(agent=AgentName.SCAM_BREAKER, scope=Scope.REQUEST, stance=Stance(stance), confidence=round2(confidence),
                     reason=reason, ms=ms, source=source);
 }
 
@@ -90,7 +90,7 @@ walker ScamBreakerStart {
         lang = _lang_of(here);
         res = scam_questions(self.situation or situation_of(here), lang);
         for q in list(res["questions"]) {
-            here +>:Checked():+> ScamCheck(question=str(q), answer="", jev_reading="", language=lang);
+            here +>:Checked():+> ScamCheck(question=str(q), answer="", jev_reading=JevReading.NONE, language=Lang(lang));
         }
         _warnings[here.id] = str(res["warning"]);
         report scam_breaker_state(here.id);
@@ -98,8 +98,15 @@ walker ScamBreakerStart {
 }
 
 walker ScamAnswer {
+    has request_id: str = "";            # set when spawned on root (C's API); empty when spawned on the Request
     has q: int = -1;                     # question index (0-based); -1 = the next unanswered one
     has answer: str = "";                # button value or typed text, any language
+
+    can locate with Root entry {
+        req = find_request(self.request_id);
+        if req is None { report {"next_question": None, "error": "unknown request"}; disengage; }
+        visit req;
+    }
 
     can answer_it with Request entry {
         checks = checks_of(here);
@@ -108,7 +115,7 @@ walker ScamAnswer {
         if idx < 0 { report {"next_question": None}; disengage; }    # all answered: ignore extra answers
         t0 = time.perf_counter();
         checks[idx].answer = self.answer;
-        checks[idx].jev_reading = jev_read_reply(self.answer);
+        checks[idx].jev_reading = JevReading(jev_read_reply(self.answer));
         ms = int((time.perf_counter() - t0) * 1000);
         left = [c for c in checks if not c.answer];
         if left {

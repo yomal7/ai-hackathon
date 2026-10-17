@@ -16,19 +16,14 @@ glob PATTERN_NAMES: dict[str, str] = {
     "LOTTERY_FEE": "Lottery fee"
 };
 
-def guardian_options(lang: str) -> list[dict] {
-    return [
-        {"value": "REJECT", "label": fixed_text("opt_reject", lang)},
-        {"value": "APPROVE", "label": fixed_text("opt_approve", lang)},
-        {"value": "CALL", "label": fixed_text("opt_call", lang)}
-    ];
+"""Button values for the guardian card. C's screen shows the labels with t(key, lang)."""
+def guardian_options(lang: str) -> list[str] {
+    return ["REJECT", "APPROVE", "CALL"];
 }
 
-def analyst_options() -> list[dict] {
-    return [
-        {"value": "APPROVE", "label": ANALYST_TEXT["opt_approve_freeze"]},
-        {"value": "KEEP_OPEN", "label": ANALYST_TEXT["opt_keep_open"]}
-    ];
+"""Button values for the analyst card."""
+def analyst_options() -> list[str] {
+    return ["APPROVE", "KEEP_OPEN"];
 }
 
 def fb_scam_questions(lang: str) -> dict {

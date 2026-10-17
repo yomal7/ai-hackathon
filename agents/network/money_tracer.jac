@@ -4,7 +4,7 @@ Each hop: ONE jev_mule_scores call for the next accounts, plus the traced-money 
 Finds where victims' money still sits (before ATM cash-out) and asks the owning bank to freeze it.
 It never freezes anything itself."""
 
-import from graph.nodes { Account, Signal, Proposal }
+import from graph.nodes { Account, Signal, Proposal, AgentName, Scope, Stance, SignalKind, SignalStatus }
 import from graph.edges { Paid, HasProposal, Emitted }
 import from ai.jev { jev_mule_scores, jev_last }
 import from ai.lang { fmt_rs }
@@ -120,7 +120,7 @@ walker MoneyTracer {
         moved = f["minutes_to_move_on"];
         traced = traced_score(acc.opened_days_ago, int(moved) if moved is not None else None, acc.kind);
         score = round2(mule_score(jev_score, traced));
-        held = 0.0 if acc.kind == "ATM_CASHOUT" else max(0.0, min(acc.balance, amount - to_float(f["moved_on_rs"])));
+        held = 0.0 if acc.kind == "ATM_CASHOUT" else max(0.0, min(float(acc.balance), amount - to_float(f["moved_on_rs"])));
         HELD[acc.id] = {"amount": held, "victim": victim};
         who = f" ({victim})" if victim else "";
         if acc.kind == "ATM_CASHOUT" {
@@ -150,10 +150,10 @@ def _proposal(acc: Account, stance: str, score: float, reason: str) -> None {
     old = [p for p in [acc ->:HasProposal:->] if isinstance(p, Proposal) and p.agent == "MONEY_TRACER"];
     last = jev_last("jev_mule_scores");
     if old {
-        old[0].stance = stance; old[0].confidence = score; old[0].reason = reason;
+        old[0].stance = Stance(stance); old[0].confidence = score; old[0].reason = reason;
         return;
     }
-    acc +>:HasProposal():+> Proposal(agent="MONEY_TRACER", scope="NETWORK", stance=stance, confidence=score,
+    acc +>:HasProposal():+> Proposal(agent=AgentName.MONEY_TRACER, scope=Scope.NETWORK, stance=Stance(stance), confidence=score,
                                      reason=reason, ms=int(last["ms"]), source=str(last["source"]));
 }
 
@@ -161,6 +161,6 @@ def _proposal(acc: Account, stance: str, score: float, reason: str) -> None {
 def _signal(acc: Account, kind: str, from_bank: str) -> None {
     old = [s for s in [acc ->:Emitted:->] if isinstance(s, Signal) and s.kind == kind];
     if old { return; }
-    acc +>:Emitted():+> Signal(kind=kind, subject_account=acc.id, from_bank=from_bank, to_bank=bank_short(acc),
-                               time=now_hms(), status="OPEN");
+    acc +>:Emitted():+> Signal(kind=SignalKind(kind), subject_account=acc.id, from_bank=from_bank, to_bank=bank_short(acc),
+                               time=now_hms(), status=SignalStatus.OPEN);
 }

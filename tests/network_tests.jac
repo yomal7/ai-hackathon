@@ -60,7 +60,7 @@ test "S3: Ceylon liaison agrees for CDB-40213 -> analyst alert, nothing frozen y
     assert liaison_stance(ids["CDB-40213"]) == "FREEZE";
     a = find_alert("AL-" + ids["CDB-40213"]);
     assert a is not None and a.kind == "ANALYST" and a.language == "en" and a.status == "OPEN";
-    assert [o["value"] for o in a.options] == ["APPROVE", "KEEP_OPEN"];
+    assert list(a.options) == ["APPROVE", "KEEP_OPEN"];
     assert len(a.lines) <= 3;
     assert acc(ids["CDB-40213"]).frozen == False;
 }

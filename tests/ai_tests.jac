@@ -102,7 +102,7 @@ test "LLM stubs return fixed texts in the asked language" {
     assert detect_language(str(scam_questions("x", "ta")["warning"])) == "ta";
     c = guardian_card("x", [], "si", {"name": "Siriwardena", "parent": "father", "amount": 4200000, "others": 2});
     assert len(list(c["lines"])) == 3 and "4,200,000" in c["title"];
-    assert [o["value"] for o in c["options"]] == ["REJECT", "APPROVE", "CALL"];
+    assert c["options"] == ["REJECT", "APPROVE", "CALL"];
     assert len(list(guardian_card("x", [], "ta")["lines"])) <= 3;
     a = analyst_card("Freeze CDB-40213?", ["e1", "e2", "e3", "e4"]);
     assert a["language"] == "en" and len(list(a["lines"])) == 3;

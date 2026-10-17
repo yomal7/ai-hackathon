@@ -1,14 +1,19 @@
 # secrets
 .env
 
-# jac / python build output
-__pycache__/
-*.pyc
+# jac / python build output and runtime data
 .jac/
 .jac_cache/
+__pycache__/
+*.pyc
 *.session
 node_modules/
 dist/
 
 # LLM answer cache (speeds up demo re-runs)
 .cache/
+
+# editors and private notes
+.vscode/
+.idea/
+PROMPT_A_graph_council.md

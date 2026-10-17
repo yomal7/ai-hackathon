@@ -4,7 +4,7 @@ Fictional people, banks and money. Used by money_tracer_tests and network_tests.
 import uuid;
 import time;
 import re;
-import from graph.nodes { Bank, Citizen, Account, Request, ScamCheck, Guardian, ScamPattern }
+import from graph.nodes { Bank, Citizen, Account, Request, ScamCheck, Guardian, ScamPattern, AccountKind, Action, RequestStatus, JevReading, Lang }
 import from graph.edges { AccountAt, Owns, Made, PaysTo, Paid, Checked, ProtectedBy, LearnedFrom }
 
 obj Story {
@@ -58,14 +58,14 @@ def _banks(sfx: str) -> dict[str, Bank] {
     return out;
 }
 
-def _acc(ids: dict[str, str], banks: dict[str, Bank], key: str, sfx: str, bank: str, owner: str, kind: str, days: int, balance: float) -> Account {
-    a = Account(id=key + "-" + sfx, bank=bank, owner_name=owner, opened_days_ago=days, kind=kind, balance=balance);
+def _acc(ids: dict[str, str], banks: dict[str, Bank], key: str, sfx: str, bank: str, owner: str, kind: str, days: int, balance: int) -> Account {
+    a = Account(id=key + "-" + sfx, bank=bank, owner_name=owner, opened_days_ago=days, kind=AccountKind(kind), balance=balance);
     a +>:AccountAt():+> banks[bank];
     ids[key] = a.id;
     return a;
 }
 
-def _pay(a: Account, b: Account, amount: float, at: str) -> None {
+def _pay(a: Account, b: Account, amount: int, at: str) -> None {
     a +>:Paid(amount=amount, time=at):+> b;
 }
 
@@ -95,16 +95,16 @@ def build_story() -> Story {
         _pay(c, shop, 2500 + i * 100, f"0{8 + i % 2}:{10 + i}");
     }
 
-    seeya = Citizen(id="CIT-SEEYA-" + sfx, name="Siriwardena", age=74, city="Kandy", language="si", is_elder=True);
+    seeya = Citizen(id="CIT-SEEYA-" + sfx, name="Siriwardena", age=74, city="Kandy", language=Lang.SI, is_elder=True);
     root ++> seeya;
     seeya +>:Owns():+> seeya_acc;
-    seeya +>:ProtectedBy():+> Guardian(id="G-DILSHAN-" + sfx, name="Dilshan", relation="son", language="si");
-    req = Request(id="REQ-S3-" + sfx, action="BREAK_FD", amount=4200000, reference_text="ආරක්ෂිත ගිණුම",
-                  status="BLOCKED", language="si", telemetry={"on_call": True, "pasted_account": True});
+    seeya +>:ProtectedBy():+> Guardian(id="G-DILSHAN-" + sfx, name="Dilshan", relation="son", language=Lang.SI);
+    req = Request(id="REQ-S3-" + sfx, action=Action.BREAK_FD, amount=4200000, time="14:30", reference_text="ආරක්ෂිත ගිණුම",
+                  status=RequestStatus.BLOCKED, language=Lang.SI, telemetry={"on_call": True, "pasted_account": True});
     seeya +>:Made():+> req;
     req +>:PaysTo():+> mule;
     for (q, a, r) in [("Q1", "ඔව්", "COACHED"), ("Q2", "ඔව්, ඔහු සීඅයිඩී කියලා කිව්වා", "COACHED"), ("Q3", "ඔව්", "COACHED")] {
-        req +>:Checked():+> ScamCheck(question=q, answer=a, jev_reading=r, language="si");
+        req +>:Checked():+> ScamCheck(question=q, answer=a, jev_reading=JevReading(r), language=Lang.SI);
     }
     return Story(ids=ids, request=req);
 }

@@ -1,78 +1,210 @@
-"""Graph nodes — names and fields FIXED by the shared plan (section 4).
-TEMPORARY COPY written by Person B (branch b-ai) so B's agents can run and be tested.
-Person A owns this file: A may use it as the start or replace it (keep the same names/fields)."""
+# Graph nodes - every node from section 4 with the FIXED names and fields (A)
+# Enums are `str` enums: Stance.HOLD == "HOLD" is True, and they go out as plain strings in JSON.
+# Extra fields added by A (all have defaults) are marked "# extra".
 
-node Bank {
-    has name: str, short: str;
+enum Lang: str { SI = "si", TA = "ta", EN = "en" }
+
+enum Action: str { BILL_PAY = "BILL_PAY", TRANSFER = "TRANSFER", BREAK_FD = "BREAK_FD", LOGIN = "LOGIN" }
+
+enum RequestStatus: str {
+    DRAFT = "DRAFT", CHECKING = "CHECKING", ALLOWED = "ALLOWED",
+    STEP_UP = "STEP_UP", HELD = "HELD", BLOCKED = "BLOCKED"
 }
 
-node Citizen {
-    has id: str, name: str, age: int = 0, city: str = "", language: str = "en",
-        is_elder: bool = False, x: float = 0.0, y: float = 0.0;
+enum AccountKind: str {
+    PERSONAL = "PERSONAL", SHOP = "SHOP", BILLER = "BILLER", HOSPITAL = "HOSPITAL",
+    MULE_SUSPECT = "MULE_SUSPECT", ATM_CASHOUT = "ATM_CASHOUT"
 }
 
-node Device {
-    has id: str, kind: str = "", first_seen: str = "", trusted: bool = False;
+enum AgentName: str {
+    COERCION = "COERCION", PLACE_TIME = "PLACE_TIME", ROUTINE = "ROUTINE", MULE_RING = "MULE_RING",
+    PATTERN = "PATTERN", ADVOCATE = "ADVOCATE", SCAM_BREAKER = "SCAM_BREAKER",
+    LIAISON_LDB = "LIAISON_LDB", LIAISON_CDB = "LIAISON_CDB", LIAISON_IDB = "LIAISON_IDB",
+    MONEY_TRACER = "MONEY_TRACER"
 }
 
-node Place {
-    has name: str, x: float = 0.0, y: float = 0.0;
+enum Scope: str { DEVICE = "DEVICE", REQUEST = "REQUEST", NETWORK = "NETWORK" }
+
+enum Stance: str {
+    ALLOW = "ALLOW", STEP_UP = "STEP_UP", HOLD = "HOLD", BLOCK = "BLOCK",
+    ASK_GUARDIAN = "ASK_GUARDIAN", FREEZE = "FREEZE", WATCH = "WATCH"
 }
 
-node Habit {
-    has action: str, typical_amount: float = 0.0, hour_from: int = 0, hour_to: int = 23, count: int = 0;
+enum Decision: str {
+    ALLOW = "ALLOW", STEP_UP = "STEP_UP", HOLD = "HOLD", BLOCK = "BLOCK",
+    ASK_GUARDIAN = "ASK_GUARDIAN", ASK_ANALYST = "ASK_ANALYST"
 }
 
-# kind: PERSONAL | SHOP | BILLER | HOSPITAL | MULE_SUSPECT | ATM_CASHOUT
-node Account {
-    has id: str, bank: str = "", owner_name: str = "", opened_days_ago: int = 0, kind: str = "PERSONAL",
-        frozen: bool = False, balance: float = 0.0, x: float = 0.0, y: float = 0.0;
+enum Assurance: str { LOW = "LOW", MEDIUM = "MEDIUM", HIGH = "HIGH" }
+
+enum JevReading: str { COACHED = "COACHED", NOT_COACHED = "NOT_COACHED", UNSURE = "UNSURE", NONE = "" }
+
+enum SignalKind: str { ACCOUNT_FLAGGED = "ACCOUNT_FLAGGED", FREEZE_REQUEST = "FREEZE_REQUEST", SESSION_REVOKED = "SESSION_REVOKED" }
+
+enum SignalStatus: str { OPEN = "OPEN", AGREED = "AGREED", OBJECTED = "OBJECTED", DONE = "DONE" }
+
+enum AlertKind: str { GUARDIAN = "GUARDIAN", ANALYST = "ANALYST" }
+
+enum AlertStatus: str { OPEN = "OPEN", ANSWERED = "ANSWERED" }
+
+"""Base of every Rakshaka node, so one edge type can start from several node types."""
+node RNode {}
+
+node Bank(RNode) {
+    has name: str;
+    has short: str;                       # LDB | CDB | IDB
 }
 
-# action: BILL_PAY | TRANSFER | BREAK_FD | LOGIN ; status: DRAFT | CHECKING | ALLOWED | STEP_UP | HELD | BLOCKED
-node Request {
-    has id: str, action: str = "TRANSFER", amount: float = 0.0, time: str = "", reference_text: str = "",
-        status: str = "DRAFT", language: str = "en", telemetry: dict = {};
+node Citizen(RNode) {
+    has id: str;
+    has name: str;
+    has age: int;
+    has city: str;
+    has language: Lang = Lang.EN;
+    has is_elder: bool = False;
+    has x: int = 0;                       # War Room canvas position (about 1000 x 600)
+    has y: int = 0;
 }
 
-node PressureReading {
-    has time: str = "", value: int = 0, top_reasons: list[str] = [];
+node Device(RNode) {
+    has id: str;
+    has kind: str;                        # e.g. "Galaxy A12 (Android)", "Linux laptop"
+    has first_seen: str;                  # e.g. "2023-02"
+    has trusted: bool = False;
 }
 
-node Proposal {
-    has agent: str, scope: str = "REQUEST", stance: str = "WATCH", confidence: float = 0.0,
-        reason: str = "", ms: int = 0, source: str = "code";
+"""A town. x / y are map positions in km (for impossible-travel checks), not canvas pixels."""
+node Place(RNode) {
+    has name: str;
+    has x: int = 0;
+    has y: int = 0;
 }
 
-node Ruling {
-    has decision: str, why: str = "", rule: str = "", ms: int = 0, deadlock: bool = False,
-        assurance: str = "LOW", locked: bool = False;
+node Habit(RNode) {
+    has action: str;                      # BILL_PAY | TRANSFER | BREAK_FD | WITHDRAW
+    has typical_amount: int;
+    has hour_from: int;
+    has hour_to: int;
+    has count: int;                       # how many times it happened
+    has label: str = "";                  # extra: e.g. "Electricity bill"
 }
 
-# jev_reading: COACHED | NOT_COACHED | UNSURE | ""
-node ScamCheck {
-    has question: str, answer: str = "", jev_reading: str = "", language: str = "en";
+node Account(RNode) {
+    has id: str;                          # e.g. "LDB-77821"
+    has bank: str;                        # bank short: LDB | CDB | IDB
+    has owner_name: str;
+    has opened_days_ago: int;
+    has kind: AccountKind = AccountKind.PERSONAL;
+    has frozen: bool = False;
+    has balance: int = 0;
+    has x: int = 0;
+    has y: int = 0;
+    has is_fd: bool = False;              # extra: fixed deposit
+    has confirmed_mule: bool = False;     # extra: set by a guardian Reject or a learned pattern (rule R1)
 }
 
-node ScamPattern {
-    has name: str, features: list[str] = [], phrases: list[str] = [], learned_from: str = "", times_matched: int = 0;
+node Request(RNode) {
+    has id: str;                          # e.g. "REQ-0003"
+    has action: Action;
+    has amount: int;
+    has time: str;                        # demo clock "HH:MM"
+    has reference_text: str = "";
+    has status: RequestStatus = RequestStatus.DRAFT;
+    has language: Lang = Lang.EN;
+    has telemetry: dict[str, any] = {};   # on_call, remote_app, pasted_account, hesitation_ms, backtracks, typing_change, new_payee
+    has walk_path: list[str] = [];        # extra: Mule Ring walk, node ids in visit order
+    has first_signal_at: float = 0.0;     # extra: wall time of the first telemetry signal (detection time)
+    has confirmed_scam: bool = False;     # extra: set by a guardian Reject
 }
 
-# kind: ACCOUNT_FLAGGED | FREEZE_REQUEST | SESSION_REVOKED ; status: OPEN | AGREED | OBJECTED | DONE
-node Signal {
-    has kind: str, subject_account: str = "", from_bank: str = "", to_bank: str = "", time: str = "", status: str = "OPEN";
+node PressureReading(RNode) {
+    has time: str;
+    has value: int;                       # 0..100
+    has top_reasons: list[str] = [];
+    has at: float = 0.0;                  # extra: wall-clock creation time - saved edges do not keep their order
 }
 
-# kind: GUARDIAN | ANALYST ; status: OPEN | ANSWERED
-node Alert {
-    has id: str, kind: str = "GUARDIAN", language: str = "en", title: str = "", lines: list[str] = [],
-        options: list = [], status: str = "OPEN", answer: str = "";
+node Proposal(RNode) {
+    has agent: AgentName;
+    has scope: Scope;
+    has stance: Stance;
+    has confidence: float;                # 0..1
+    has reason: str;                      # short, English
+    has ms: int = 0;
+    has source: str = "code";             # "jev" | "llm" | "code" | "fallback"
+    has at: float = 0.0;                  # extra: wall-clock creation time - saved edges do not keep their order
 }
 
-node Guardian {
-    has id: str, name: str = "", relation: str = "", language: str = "en";
+node Ruling(RNode) {
+    has decision: Decision;
+    has why: str;
+    has rule: str;                        # "R1".."R6"
+    has ms: int = 0;
+    has deadlock: bool = False;
+    has assurance: Assurance = Assurance.LOW;
+    has locked: bool = False;
+    has at: float = 0.0;                  # extra: wall-clock creation time - saved edges do not keep their order
 }
 
-node Analyst {
-    has id: str, name: str = "", language: str = "en";
+node ScamCheck(RNode) {
+    has question: str;
+    has answer: str = "";
+    has jev_reading: JevReading = JevReading.NONE;
+    has language: Lang = Lang.EN;
+}
+
+node ScamPattern(RNode) {
+    has name: str;
+    has features: list[str] = [];
+    has phrases: list[str] = [];              # scam phrases in si / ta / en / Singlish mixed
+    has learned_from: str = "";               # request id
+    has times_matched: int = 0;
+}
+
+node Signal(RNode) {
+    has kind: SignalKind;
+    has subject_account: str;                 # account id
+    has from_bank: str;
+    has to_bank: str;
+    has time: str;
+    has status: SignalStatus = SignalStatus.OPEN;
+}
+
+node Alert(RNode) {
+    has id: str;
+    has kind: AlertKind;
+    has language: Lang;
+    has title: str;
+    has lines: list[str] = [];
+    has options: list[str] = [];
+    has status: AlertStatus = AlertStatus.OPEN;
+    has answer: str = "";
+}
+
+node Guardian(RNode) {
+    has id: str;
+    has name: str;
+    has relation: str;                        # son | daughter | ...
+    has language: Lang = Lang.EN;
+}
+
+node Analyst(RNode) {
+    has id: str;
+    has name: str;
+    has language: Lang = Lang.EN;
+}
+
+"""extra: one per graph. Demo counters, current request and timeline. Cleared by ResetDemo."""
+node DemoState(RNode) {
+    has next_request: int = 1;
+    has next_alert: int = 1;
+    has current_request: str = "";
+    has checked: int = 0;
+    has blocked: int = 0;
+    has held: int = 0;
+    has protected_rs: int = 0;
+    has recovered_rs: int = 0;                # B updates it
+    has human_needed: int = 0;
+    has detect_times: list[dict[str, any]] = [];   # [{"name", "seconds"}]; seconds None = missed
+    has timeline: list[dict[str, any]] = [];       # [{"time", "agent", "text"}]
 }

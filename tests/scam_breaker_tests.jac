@@ -3,7 +3,7 @@ No network: keys are cleared, so questions are the fixed texts and replies use t
 
 import os;
 import uuid;
-import from graph.nodes { Citizen, Request, Guardian, Alert, Proposal, ScamCheck }
+import from graph.nodes { Citizen, Request, Guardian, Alert, Proposal, ScamCheck, Action, RequestStatus, AlertKind, Lang }
 import from graph.edges { Made, ProtectedBy, Raised, HasProposal, Checked }
 import from agents.council.scam_breaker {
     ScamBreakerStart, ScamAnswer, scam_breaker_state, people_saw, find_request
@@ -21,12 +21,12 @@ with entry {
 def make_case(name: str, lang: str, guardian: str) -> Request {
     forget_test_graph();
     rid = "REQ-" + new_mark();
-    c = Citizen(id="C-" + rid, name=name, age=74, city="Kandy", language=lang, is_elder=True);
-    r = Request(id=rid, action="BREAK_FD", amount=4200000, reference_text="safe account", status="HELD",
-                language=lang, telemetry={"on_call": True, "pasted_account": True});
+    c = Citizen(id="C-" + rid, name=name, age=74, city="Kandy", language=Lang(lang), is_elder=True);
+    r = Request(id=rid, action=Action.BREAK_FD, amount=4200000, time="14:30", reference_text="safe account", status=RequestStatus.HELD,
+                language=Lang(lang), telemetry={"on_call": True, "pasted_account": True});
     root ++> c;
     c +>:Made():+> r;
-    c +>:ProtectedBy():+> Guardian(id="G-" + rid, name=guardian, relation="son", language=lang);
+    c +>:ProtectedBy():+> Guardian(id="G-" + rid, name=guardian, relation="son", language=Lang(lang));
     return r;
 }
 
@@ -91,7 +91,7 @@ test "answer by question index" {
 test "people_saw shows the elder's questions and the guardian card" {
     r = make_case("Siriwardena", "si", "Dilshan");
     r spawn ScamBreakerStart();
-    r +>:Raised():+> Alert(id="AL-" + r.id, kind="GUARDIAN", language="si", title="කරුණාකර බලන්න", lines=["එක", "දෙක"]);
+    r +>:Raised():+> Alert(id="AL-" + r.id, kind=AlertKind.GUARDIAN, language=Lang.SI, title="කරුණාකර බලන්න", lines=["එක", "දෙක"]);
     st = scam_breaker_state(r.id);
     assert "Dilshan" in str(st["guardian_message"]);
     saw = people_saw(r.id);

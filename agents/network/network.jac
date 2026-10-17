@@ -3,7 +3,7 @@ RunNetwork (spawned by A on a confirmed scam): Pattern Learner -> Money Tracer -
 ApplyAnalystAnswer (spawned by C's analyst_answer API): the ONLY place an account is frozen,
 and only after a human analyst says APPROVE."""
 
-import from graph.nodes { Request, Account, Signal, Alert }
+import from graph.nodes { Request, Account, Signal, Alert, SignalStatus, AlertStatus }
 import from graph.edges { PaysTo, Emitted, Raised }
 import from ai.lang { fmt_rs }
 import from rules.network_rules { may_freeze }
@@ -44,18 +44,18 @@ walker ApplyAnalystAnswer {
         if alert is None or alert.kind != "ANALYST" or alert.status == "ANSWERED" { report {"ok": False}; disengage; }
         sigs = [s for s in [alert <-:Raised:<-] if isinstance(s, Signal)];
         acc = account_of(sigs[0]) if sigs else None;
-        alert.status = "ANSWERED";
+        alert.status = AlertStatus.ANSWERED;
         alert.answer = self.answer;
         if sigs and acc is not None {
             if may_freeze(self.answer) {
                 acc.frozen = True;
-                sigs[0].status = "DONE";
+                sigs[0].status = SignalStatus.DONE;
                 held = held_amount(acc);
                 victim = held_victim(acc);
                 TOTALS["recovered_rs"] = TOTALS["recovered_rs"] + held;
                 add_line("ANALYST", f"Analyst approved: {acc.id} frozen before cash-out. Rs {fmt_rs(held)} recovered" + (f" for {victim}." if victim else "."));
             } else {
-                sigs[0].status = "OBJECTED";
+                sigs[0].status = SignalStatus.OBJECTED;
                 add_line("ANALYST", f"Analyst kept {acc.id} open — we don't freeze innocent shops.");
             }
         }

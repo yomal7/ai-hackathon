@@ -1,16 +1,57 @@
-# Rakshaka — Jac project file. Person A owns it; B added the AI parts.
 [project]
 name = "rakshaka"
 version = "0.1.0"
-description = "Rakshaka — AI agent network protecting elders from phone scams (simulation)"
+description = "Rakshaka - an AI agent network that stops scammers from emptying elders' bank accounts (simulation)"
 entry-point = "main.jac"
-jac-version = "==0.34.24"          # JacHammer / judging version (native jac binary)
+kind = "fullstack"
+jac-version = "==0.34.24"          # JacHammer / judging version (native jac binary). Local pip jaclang 0.16 also works.
 
 # Python packages our code imports (JacHammer and `jac install` install these).
 [dependencies]
+python-dotenv = ">=1.0.0"
 httpx = ">=0.27"
-python-dotenv = ">=1.0"
 
-# LLM for `by llm()` (Gemini). The key comes from the GEMINI_API_KEY env var.
+[dependencies.npm]
+react = "^18.2.0"
+react-dom = "^18.2.0"
+react-router-dom = "^6.22.0"
+react-error-boundary = "^5.0.0"
+react-hook-form = "^7.71.0"
+zod = "^4.3.6"
+"@hookform/resolvers" = "^5.2.2"
+"qrcode.react" = "^4.2.0"
+
+[dependencies.npm.dev]
+vite = "^6.4.1"
+"@vitejs/plugin-react" = "^4.2.1"
+typescript = "^5.3.3"
+"@types/react" = "^18.2.0"
+"@types/react-dom" = "^18.2.0"
+
+[dev-dependencies]
+watchdog = ">=3.0.0"
+
+[serve]
+base_route_app = "app"
+
+# The graph topology index makes every edge write re-encode the whole graph (O(edges^2) seeding)
+# and every typed read decode it (~12 ms). Our graph is small and in memory: walking edges is faster.
+[run]
+topology_index = false
+
+[test]
+directory = "tests"
+
+# App title + LLM model. Both table styles are kept on purpose:
+# [plugins.*] is read by pip jaclang 0.16, [client] / [byllm] by jac 0.34 (JacHammer). Keep them the same.
+[plugins.client.app_meta_data]
+title = "Rakshaka (simulation)"
+
+[client.app_meta_data]
+title = "Rakshaka (simulation)"
+
+[plugins.byllm.model]
+default_model = "${LLM_MODEL:-gemini/gemini-3.5-flash-lite}"
+
 [byllm.model]
-default_model = "gemini/gemini-3.5-flash-lite"
+default_model = "${LLM_MODEL:-gemini/gemini-3.5-flash-lite}"

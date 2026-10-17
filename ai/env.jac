@@ -38,8 +38,9 @@ def llm_key_present() -> bool {
     return bool(env("GEMINI_API_KEY") or env("GOOGLE_API_KEY") or env("OPENAI_API_KEY") or env("ANTHROPIC_API_KEY"));
 }
 
+"""LLM_MODEL (team setting, also used by jac.toml), else BYLLM_DEFAULT_MODEL, else Gemini Flash-Lite."""
 def llm_model_name() -> str {
-    return env("BYLLM_DEFAULT_MODEL", "gemini/gemini-3.5-flash-lite") or "gemini/gemini-3.5-flash-lite";
+    return env("LLM_MODEL") or env("BYLLM_DEFAULT_MODEL") or "gemini/gemini-3.5-flash-lite";
 }
 
 """The byLLM Model for by llm() calls, from whichever Jac version is running."""

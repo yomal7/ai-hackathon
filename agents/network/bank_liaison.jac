@@ -2,7 +2,7 @@
 For each FREEZE_REQUEST sent to its bank, it decides FREEZE / WATCH / IGNORE with its OWN
 advocate check, then the plain-code network rules raise an analyst Alert. It never freezes."""
 
-import from graph.nodes { Account, Signal, Alert, Proposal }
+import from graph.nodes { Account, Signal, Alert, Proposal, AgentName, Scope, Stance, SignalStatus, AlertKind, AlertStatus, Lang }
 import from graph.edges { Emitted, Raised, HasProposal }
 import from ai.llm_calls { analyst_card }
 import from ai.lang { fmt_rs }
@@ -44,7 +44,7 @@ walker BankLiaison {
         acc = account_of(sig);
         if acc is None { return; }
         if acc.frozen {                  # IGNORE: nothing left to do
-            sig.status = "DONE";
+            sig.status = SignalStatus.DONE;
             add_line(agent, f"{acc.id} is already frozen — ignore.");
             self.decided.append({"account": acc.id, "decision": "IGNORE"});
             return;
@@ -65,7 +65,7 @@ walker BankLiaison {
             stance = "FREEZE";
             conf = score;
             reason = f"{bank_name} agrees to freeze {name}: mule score {score}, no objection from our advocate.";
-            sig.status = "AGREED";
+            sig.status = SignalStatus.AGREED;
             card = analyst_card(f"Freeze {name} at {bank_name}?",
                                 [tracer_side, f"{bank_name} Liaison agrees: FREEZE.", "Cross-bank freeze needs your approval."]);
             self._alert(sig, str(card["title"]), list(card["lines"]), list(card["options"]));
@@ -83,7 +83,7 @@ walker BankLiaison {
             conf = 1.0 - score;
             reason = f"{bank_name} will watch {name}: mule score {score} is below 0.8.";
         }
-        acc +>:HasProposal():+> Proposal(agent=agent, scope="NETWORK", stance=stance, confidence=round2(conf),
+        acc +>:HasProposal():+> Proposal(agent=AgentName(agent), scope=Scope.NETWORK, stance=Stance(stance), confidence=round2(conf),
                                          reason=reason, ms=0, source="code");
         owner = f" of {victim}'s money" if victim else "";
         money = f" Rs {fmt_rs(held)}{owner} is still there." if held > 0 else "";
@@ -92,7 +92,7 @@ walker BankLiaison {
     }
 
     def _alert(sig: Signal, title: str, lines: list[str], options: list) -> None {
-        sig +>:Raised():+> Alert(id="AL-" + sig.subject_account, kind="ANALYST", language="en", title=title,
-                                 lines=lines[:3], options=options, status="OPEN", answer="");
+        sig +>:Raised():+> Alert(id="AL-" + sig.subject_account, kind=AlertKind.ANALYST, language=Lang.EN, title=title,
+                                 lines=lines[:3], options=[str(o) for o in options], status=AlertStatus.OPEN, answer="");
     }
 }
