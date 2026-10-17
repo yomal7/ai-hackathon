@@ -2,6 +2,8 @@
 Fictional people, banks and money. Used by money_tracer_tests and network_tests."""
 
 import uuid;
+import time;
+import re;
 import from graph.nodes { Bank, Citizen, Account, Request, ScamCheck, Guardian, ScamPattern }
 import from graph.edges { AccountAt, Owns, Made, PaysTo, Paid, Checked, ProtectedBy, LearnedFrom }
 
@@ -11,9 +13,22 @@ obj Story {
 }
 
 glob MARK: str = "TST";       # every test id contains this, so old test stories can be removed
+glob MAX_AGE_S: int = 600;    # only stories older than this are removed (tests may run in parallel)
+
+"""A fresh marker: TST<unix seconds>x<random>, e.g. TST1760700000xa1b2."""
+def new_mark() -> str {
+    return f"{MARK}{int(time.time())}x{uuid.uuid4().hex[:4]}";
+}
+
+"""True for an OLD test node (marker older than MAX_AGE_S, or an old marker without a time)."""
+def _old_mark(text: str) -> bool {
+    if MARK not in text { return False; }
+    m = re.search(MARK + "(\d{9,})x", text);
+    return m is None or time.time() - int(m.group(1)) > MAX_AGE_S;
+}
 
 def _marked(n: any) -> bool {
-    return MARK in str(getattr(n, "id", "")) or MARK in str(getattr(n, "name", ""));
+    return _old_mark(str(getattr(n, "id", ""))) or _old_mark(str(getattr(n, "name", "")));
 }
 
 """Disconnect old test stories from root (Jac keeps the graph between runs; this keeps tests fast)."""
@@ -23,7 +38,7 @@ def forget_test_graph() -> None {
             for r in [n ->:LearnedFrom:->] {
                 if _marked(r) { for e in [edge n ->:LearnedFrom:-> r] { del e; } }
             }
-            if MARK in n.learned_from and not [n ->:LearnedFrom:->] {
+            if _old_mark(n.learned_from) and not [n ->:LearnedFrom:->] {
                 for e in [edge root --> n] { del e; }
             }
         } elif _marked(n) {
@@ -57,7 +72,7 @@ def _pay(a: Account, b: Account, amount: float, at: str) -> None {
 """Build the story with fresh unique ids."""
 def build_story() -> Story {
     forget_test_graph();
-    sfx = MARK + uuid.uuid4().hex[:6];
+    sfx = new_mark();
     ids: dict[str, str] = {};
     banks = _banks(sfx);
     mallika = _acc(ids, banks, "LDB-10001", sfx, "LDB", "Mallika", "PERSONAL", 7000, 1500000);

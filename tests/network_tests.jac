@@ -18,15 +18,18 @@ with entry {
 
 glob _ids: dict[str, str] = {};
 
-"""Build the S3 story and run the network ONCE for this file (graph writes are slow).
-Tests run in order: checks first, then the analyst's answers, then follow-up checks."""
+"""A NEW S3 story with the network already run. For tests that change things or read network memory."""
+def fresh_s3() -> dict[str, str] {
+    reset_network();
+    story = build_story();
+    story.request spawn RunNetwork();
+    return story.ids;
+}
+
+"""One shared S3 story for read-only tests (graph writes are slow).
+Tests may run in any order or in parallel (Jac 0.34 uses pytest workers), so nothing here changes it."""
 def run_s3() -> dict[str, str] {
-    if not _ids {
-        reset_network();
-        story = build_story();
-        _ids.update(story.ids);
-        story.request spawn RunNetwork();
-    }
+    if not _ids { _ids.update(fresh_s3()); }
     return _ids;
 }
 
@@ -83,7 +86,7 @@ test "a cross-bank freeze always needs the analyst" {
 }
 
 test "analyst APPROVE freezes CDB-40213 and recovers Rs 650,000 for Mallika" {
-    ids = run_s3();
+    ids = fresh_s3();
     res = root spawn ApplyAnalystAnswer(alert_id="AL-" + ids["CDB-40213"], answer="APPROVE");
     assert res.reports[0]["ok"];
     assert acc(ids["CDB-40213"]).frozen == True;
@@ -95,11 +98,11 @@ test "analyst APPROVE freezes CDB-40213 and recovers Rs 650,000 for Mallika" {
 }
 
 test "analyst KEEP_OPEN: Perera Hardware is never frozen" {
-    ids = run_s3();
+    ids = fresh_s3();
     root spawn ApplyAnalystAnswer(alert_id="AL-" + ids["CDB-11502"], answer="KEEP_OPEN");
     assert acc(ids["CDB-11502"]).frozen == False;
     assert signal_of(ids["CDB-11502"]).status == "OBJECTED";
-    assert TOTALS["recovered_rs"] == 650000;                # only Mallika's money, nothing from the shop
+    assert TOTALS["recovered_rs"] == 0;                     # keeping the shop open recovers nothing
     res = root spawn ApplyAnalystAnswer(alert_id="AL-" + ids["CDB-11502"], answer="APPROVE");   # already answered
     assert res.reports[0]["ok"] == False;
     assert acc(ids["CDB-11502"]).frozen == False;
@@ -117,7 +120,7 @@ test "pattern learned from S3 matches the Tamil S4 request (network immunity)" {
 }
 
 test "network_state shape for the War Room" {
-    ids = run_s3();
+    ids = fresh_s3();
     st = network_state();
     for key in ["signals", "alerts", "walk", "recovered_rs", "timeline", "patterns"] {
         assert key in st, key;

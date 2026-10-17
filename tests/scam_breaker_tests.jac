@@ -9,7 +9,7 @@ import from agents.council.scam_breaker {
     ScamBreakerStart, ScamAnswer, scam_breaker_state, people_saw, find_request
 }
 import from ai.lang { detect_language }
-import from tests.net_story { forget_test_graph, MARK }
+import from tests.net_story { forget_test_graph, new_mark }
 
 with entry {
     for k in ["TYPESAFE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"] {
@@ -20,7 +20,7 @@ with entry {
 """Elder + guardian + one scam Request, with a unique id (the graph persists between runs)."""
 def make_case(name: str, lang: str, guardian: str) -> Request {
     forget_test_graph();
-    rid = "REQ-" + MARK + uuid.uuid4().hex[:8];
+    rid = "REQ-" + new_mark();
     c = Citizen(id="C-" + rid, name=name, age=74, city="Kandy", language=lang, is_elder=True);
     r = Request(id=rid, action="BREAK_FD", amount=4200000, reference_text="safe account", status="HELD",
                 language=lang, telemetry={"on_call": True, "pasted_account": True});
