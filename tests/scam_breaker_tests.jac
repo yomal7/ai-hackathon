@@ -104,3 +104,10 @@ test "unknown request: inactive state, nothing seen" {
     assert scam_breaker_state("NO-SUCH-REQ")["active"] == False;
     assert people_saw("NO-SUCH-REQ") == [];
 }
+
+# Runs last (tests run in file order on Jac 0.16): leave the shared graph as we found it,
+# so other test files (A's War Room / seed tests) do not see our test stories.
+test "zz clean up this file's test stories" {
+    forget_test_graph(True);
+    assert True;
+}

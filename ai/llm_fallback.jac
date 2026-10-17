@@ -31,6 +31,8 @@ def fb_scam_questions(lang: str) -> dict {
         "language": lang,
         "questions": [fixed_text(k, lang) for k in ["sb_q1", "sb_q2", "sb_q3"]],
         "warning": fixed_text("sb_warning", lang),
+        "questions_en": [fixed_text(k, "en") for k in ["sb_q1", "sb_q2", "sb_q3"]],
+        "warning_en": fixed_text("sb_warning", "en"),
         "source": "fallback"
     };
 }

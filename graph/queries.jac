@@ -1,6 +1,7 @@
 # Graph helpers: find nodes by id, demo state, clear the graph, create a Request (A)
 # Root holds: Bank, Citizen, Place, Analyst, DemoState. Everything else hangs off them.
 import time;
+import from operator { attrgetter }
 import from datetime { datetime }
 import from graph.nodes {
     RNode, Bank, Citizen, Device, Place, Account, Request, Guardian, Analyst, Alert, DemoState,
@@ -78,7 +79,7 @@ def all_requests() -> list[Request] {
     for c in all_citizens() {
         reqs.extend([c ->:Made:->]);
     }
-    return sorted(reqs, key=lambda r: Request: r.id);
+    return sorted(reqs, key=attrgetter("id"));
 }
 
 def find_request(request_id: str) -> Request | None {
@@ -145,7 +146,7 @@ def all_alerts() -> list[Alert] {
             seen[a.id] = a;
         }
     }
-    return sorted(seen.values(), key=lambda a: Alert: a.id);
+    return sorted(seen.values(), key=attrgetter("id"));
 }
 
 def find_alert(alert_id: str) -> Alert | None {
@@ -239,8 +240,8 @@ def create_request(
     c +>:Made:+> req;
     dev = device;
     if dev is None {
-        own = [d for d in [c ->:Uses:->] if d.trusted];
-        dev = own[0] if own else None;
+        mine = [d for d in [c ->:Uses:->] if d.trusted];
+        dev = mine[0] if mine else None;
     }
     if dev is not None {
         req +>:From:+> dev;

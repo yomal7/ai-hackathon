@@ -23,9 +23,13 @@ obj ScamQuestions {
     has language: str;
     has questions: list[str];
     has warning: str;
+    has questions_en: list[str];
+    has warning_en: str;
 }
-sem ScamQuestions.questions = "2 or 3 short, calm yes/no questions. One idea each. No numbers.";
+sem ScamQuestions.questions = "2 or 3 short, calm yes/no questions. One idea each. No numbers. YES must always mean a scam sign (someone on the phone guiding them, saying they are police / CID / bank, asking for secrecy or a safe account). Never ask a question where YES is the safe answer, like 'Did you talk to your family?'.";
 sem ScamQuestions.warning = "One short calm warning line: police and banks never ask you to move money to a safe account; talk to your family.";
+sem ScamQuestions.questions_en = "The same questions in plain English, same order and same meaning (spoken aloud when the phone has no voice for the language).";
+sem ScamQuestions.warning_en = "The same warning line in plain English.";
 
 obj Card {
     has language: str;
@@ -64,7 +68,7 @@ glob STYLE: str = "Use simple, calm, everyday words. No jargon. Short sentences.
 # ==================== Scam-Breaker questions ====================
 
 def _llm_questions(situation: str, language: str, style: str) -> ScamQuestions by llm(temperature=0.3);
-sem _llm_questions = "Write 2 or 3 short, calm yes/no questions that gently check whether an elderly bank customer is being guided by a scam caller right now, and one warning line. Write ONLY in the given language. Never use numbers.";
+sem _llm_questions = "Write 2 or 3 short, calm yes/no questions that gently check whether an elderly bank customer is being guided by a scam caller right now, and one warning line. Every question is asked so that YES means a warning sign (the elder's Yes / No buttons are read that way). Write ONLY in the given language. Never use numbers.";
 sem _llm_questions.situation = "What is happening (English).";
 sem _llm_questions.language = "The language and script to write in.";
 sem _llm_questions.style = "How to write.";
@@ -75,13 +79,19 @@ def _gen_questions(situation: str, lang: str) -> dict | None {
     if len(qs) < 2 or not all([text_ok(x, lang, 160) for x in qs]) { return None; }
     if not text_ok(q.warning, lang, 260) { return None; }
     if not numbers_ok(" ".join(qs) + q.warning, situation) { return None; }
-    return {"language": lang, "questions": qs, "warning": q.warning.strip(), "source": "llm"};
+    # English twin for the voice fallback: same count, English text; else use the elder's own lines.
+    en = [x.strip() for x in q.questions_en if x.strip()][:3];
+    if lang == "en" or len(en) != len(qs) or not all([text_ok(x, "en", 200) for x in en]) { en = qs if lang == "en" else []; }
+    warn_en = q.warning_en.strip() if text_ok(q.warning_en, "en", 300) else "";
+    return {"language": lang, "questions": qs, "warning": q.warning.strip(), "questions_en": en,
+            "warning_en": warn_en, "source": "llm"};
 }
 
-"""{"language", "questions": [2-3 str], "warning"} in the elder's language."""
+"""{"language", "questions": [2-3 str], "warning"} in the elder's language.
+Extra: "questions_en" / "warning_en" - the same lines in English, for the phone's voice fallback."""
 def scam_questions(situation: str, language: str) -> dict {
     lang = safe_lang(language);
-    res = run_llm("scam_questions", {"s": situation, "l": lang}, partial(_gen_questions, situation, lang));
+    res = run_llm("scam_questions_v3", {"s": situation, "l": lang}, partial(_gen_questions, situation, lang));
     return dict(res) if res else fb_scam_questions(lang);
 }
 

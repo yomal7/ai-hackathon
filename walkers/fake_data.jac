@@ -245,8 +245,7 @@ def fake_set_language(person_id: str, language: str) {
 
 """Back to an empty demo."""
 def fake_reset() {
-    global STATE;
-    STATE = FakeState();
+    STATE.__dict__.update(FakeState().__dict__);    # reset in place (no `global`: works on Jac 0.16 and 0.34)
 }
 
 glob SCREEN_OF: dict[str, str] = {"DRAFT": "FORM"};

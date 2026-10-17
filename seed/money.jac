@@ -3,6 +3,12 @@ import from graph.nodes { Bank, Citizen, Account, AccountKind }
 import from graph.edges { AccountAt, Paid }
 import from seed.banks { open_account }
 import from seed.people { NORMAL_CITIZENS, normal_account_id }
+import from operator { attrgetter }
+
+# Story elders first, then by id (a named function: Jac 0.34 cannot run block lambdas inside a def).
+def _seed_order(c: Citizen) -> tuple {
+    return (0 if c.id in ["c_seeya", "c_mallika", "c_rasheed", "c_kamala"] else 1, c.id);
+}
 
 # The scam money chain, in order: first mule -> second -> third -> ATM cash-out.
 glob MULE_CHAIN: list[str] = ["LDB-77821", "CDB-40213", "IDB-90077", "ATM-IDB-0042"];
@@ -86,7 +92,7 @@ def seed_money(banks: dict[str, Bank], acc: dict[str, Account]) {
 """Give every Citizen and Account an x / y on the War Room canvas (about 1000 x 600)."""
 def layout_canvas(banks: dict[str, Bank]) {
     # People on the left: 2 columns, story elders first
-    people = sorted([root -->[?:Citizen]], key=lambda c: Citizen: (0 if c.id in ["c_seeya", "c_mallika", "c_rasheed", "c_kamala"] else 1, c.id));
+    people = sorted([root -->[?:Citizen]], key=_seed_order);
     for (i, c) in enumerate(people) {
         c.x = 50 + (i % 2) * 100;
         c.y = 40 + (i // 2) * 45;
@@ -95,7 +101,7 @@ def layout_canvas(banks: dict[str, Bank]) {
     rows = [y for y in range(40, 580, 42) if abs(y - CHAIN_Y) > 30];
     for (short, b) in banks.items() {
         col = BANK_COLUMN_X[short];
-        others = sorted([a for a in [b <-:AccountAt:<-] if a.id not in MULE_CHAIN], key=lambda a: Account: a.id);
+        others = sorted([a for a in [b <-:AccountAt:<-] if a.id not in MULE_CHAIN], key=attrgetter("id"));
         for (j, a) in enumerate(others) {
             a.x = col - 45 + (j % 2) * 90;
             a.y = rows[(j // 2) % len(rows)];

@@ -2,7 +2,7 @@
 # Return SHAPES are fixed by section 8. C's API just returns these dicts.
 # Signals, alerts and counters are read from the graph, so A's and B's nodes both show up once.
 import from graph.nodes {
-    RNode, Bank, Citizen, Account, Request, Signal, Alert, Guardian, PressureReading,
+    RNode, Bank, Citizen, Account, Request, Signal, Alert, Guardian, PressureReading, Proposal,
     AccountKind, RequestStatus, AlertKind, AlertStatus
 }
 import from graph.edges { Owns, Paid, Uses, Usually, Made, Raised, ProtectedBy }
@@ -16,6 +16,20 @@ import from agents.council.scam_breaker { scam_breaker_state, people_saw }
 import from agents.network.network { network_state }
 import from ai.llm_calls { debrief }
 import from seed.money { BANK_COLUMN_X }
+import from operator { attrgetter }
+
+# Sort keys as named functions (Jac 0.34 cannot run block lambdas inside a def).
+def _agent_rank(p: Proposal) -> int {
+    return AGENT_ORDER.index(str(p.agent)) if str(p.agent) in AGENT_ORDER else 99;
+}
+
+def _time_of(t: dict) -> str {
+    return str(t.get("time", ""));
+}
+
+def _id_of(d: dict) -> str {
+    return str(d["id"]);
+}
 
 # Agent order on the War Room cards.
 glob AGENT_ORDER: list[str] = [
@@ -44,7 +58,7 @@ def all_signals() -> list[Signal] {
 
 """Every Alert node, oldest first."""
 def alerts_in(nodes: list[RNode]) -> list[Alert] {
-    return sorted([n for n in nodes if isinstance(n, Alert)], key=lambda a: Alert: a.id);
+    return sorted([n for n in nodes if isinstance(n, Alert)], key=attrgetter("id"));
 }
 
 def alert_dict(a: Alert) -> dict[str, any] {
@@ -218,7 +232,7 @@ def war_room_data() -> dict[str, any] {
     pressure: dict[str, any] = {"value": 0, "reasons": []};
     saw: list[dict] = [];
     if req is not None {
-        props = sorted(proposals_of(req), key=lambda p: any: AGENT_ORDER.index(str(p.agent)) if str(p.agent) in AGENT_ORDER else 99);
+        props = sorted(proposals_of(req), key=_agent_rank);
         proposals = [proposal_dict(p) for p in props];
         r = ruling_of(req);
         ruling = ruling_dict(r) if r is not None else None;
@@ -228,7 +242,7 @@ def war_room_data() -> dict[str, any] {
         }
         saw = people_saw(req.id);
     }
-    timeline = sorted(list(st.timeline) + list(net.get("timeline", []) or []), key=lambda t: any: str(t.get("time", "")));
+    timeline = sorted(list(st.timeline) + list(net.get("timeline", []) or []), key=_time_of);
     return {
         "graph": graph_data(req),
         "request": request_dict(req) if req is not None else None,
@@ -280,15 +294,15 @@ def phone_data(request_id: str) -> dict[str, any] {
                 "scam_breaker": scam_breaker_state(request_id), "message": ""};
     }
     c = citizen_of(req);
-    own = [c ->:Owns:->] if c is not None else [];
+    mine = [c ->:Owns:->] if c is not None else [];
     pr = latest_pressure(req);
     sb = scam_breaker_state(req.id);
     return {
         "language": str(c.language) if c is not None else str(req.language),
         "screen": PHONE_SCREEN.get(str(req.status), "FORM"),
         "pressure": pr.value if pr is not None else 0,
-        "balance": sum([a.balance for a in own if not a.is_fd]),
-        "fd": sum([a.balance for a in own if a.is_fd]),
+        "balance": sum([a.balance for a in mine if not a.is_fd]),
+        "fd": sum([a.balance for a in mine if a.is_fd]),
         "scam_breaker": sb,
         "message": phone_message(req, bool(sb.get("active", False)))
     };
@@ -316,7 +330,7 @@ def guardian_data(guardian_id: str) -> dict[str, any] {
             }
         }
     }
-    alerts = sorted(alerts, key=lambda d: any: str(d["id"]), reverse=True);
+    alerts = sorted(alerts, key=_id_of, reverse=True);
     return {"language": str(g.language), "name": g.name, "alerts": alerts};
 }
 

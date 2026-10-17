@@ -6,6 +6,7 @@
 #   request_id ""                -> the demo's current request
 #   request_id "latest:<cid>"    -> that citizen's newest request (Kamala's phone follows S4)
 #   telemetry_update with ""     -> the signals stay on the device; the next request starts with them
+import from operator { attrgetter }
 import from graph.nodes { Request, RequestStatus }
 import from graph.edges { Made, Owns, Paid }
 import from graph.queries { demo_state, find_citizen, find_request, create_request, set_person_language }
@@ -33,6 +34,7 @@ glob ACTIONS: list[str] = ["BILL_PAY", "TRANSFER", "BREAK_FD", "LOGIN"];
 glob SCENARIO_NAMES: list[str] = ["S1", "S2", "S3", "S4", "S5"];
 
 # Simulated phone signals set before a request exists (control panel toggles, the phone's own paste).
+# Changed in place (clear / update), so no `global` is needed (Jac 0.34 has no `global`).
 glob DEVICE: dict[str, any] = {};
 
 """True when this endpoint should call the real walker."""
@@ -50,7 +52,7 @@ def resolve(request_id: str) -> Request | None {
     }
     if request_id.startswith("latest:") {
         c = find_citizen(request_id.split(":", 1)[1]);
-        mine = sorted([c ->:Made:->], key=lambda r: Request: r.id) if c is not None else [];
+        mine = sorted([c ->:Made:->], key=attrgetter("id")) if c is not None else [];
         return mine[-1] if mine else None;
     }
     return find_request(request_id);
@@ -78,10 +80,10 @@ def known_payee(citizen_id: str, payee: str) -> bool {
 """Elder's phone with no request yet: home screen, own balances, device pressure."""
 def home_phone(citizen_id: str) -> dict[str, any] {
     c = find_citizen(citizen_id);
-    own = [c ->:Owns:->] if c is not None else [];
+    mine = [c ->:Owns:->] if c is not None else [];
     return {
         "language": str(c.language) if c is not None else "en", "screen": "HOME", "pressure": device_pressure(),
-        "balance": sum([a.balance for a in own if not a.is_fd]), "fd": sum([a.balance for a in own if a.is_fd]),
+        "balance": sum([a.balance for a in mine if not a.is_fd]), "fd": sum([a.balance for a in mine if a.is_fd]),
         "scam_breaker": scam_breaker_state(""), "message": ""
     };
 }
@@ -196,9 +198,8 @@ walker:pub telemetry_update {
             report {"pressure": fake_telemetry(self.request_id, self.signals)};
             disengage;
         }
-        global DEVICE;
         if not self.request_id {
-            DEVICE = {**DEVICE, **self.signals};
+            DEVICE.update(self.signals);
         }
         req = resolve(self.request_id);
         if req is None or (not self.request_id and req.status != RequestStatus.DRAFT) {
@@ -309,8 +310,7 @@ walker:pub run_scenario {
             report {"request_id": fake_scenario(name)};
             disengage;
         }
-        global DEVICE;
-        DEVICE = {};
+        DEVICE.clear();
         run = root spawn RunScenario(name=name, live=self.live);
         if self.live {
             report {"request_id": run.request_id, "steps": scenario_steps(name)};
@@ -323,8 +323,7 @@ walker:pub run_scenario {
 """Reset the whole demo. Reports {"ok"}."""
 walker:pub reset_demo {
     can go with Root entry {
-        global DEVICE;
-        DEVICE = {};
+        DEVICE.clear();
         if _real("reset_demo") {
             root spawn ResetDemo();
         } else {

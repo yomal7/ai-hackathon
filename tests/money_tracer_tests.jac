@@ -7,7 +7,7 @@ import from graph.edges { Emitted, HasProposal }
 import from agents.network.money_tracer { MoneyTracer, paid_out, paid_in }
 import from agents.network.net_common { find_account, reset_network, WALK, HELD, to_minutes }
 import from rules.network_rules { traced_score, network_verdict, advocate_objection, may_freeze }
-import from tests.net_story { build_story }
+import from tests.net_story { forget_test_graph, build_story }
 
 with entry {
     for k in ["TYPESAFE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"] {
@@ -111,4 +111,11 @@ test "network rules are plain code" {
     assert advocate_objection(4200, "SHOP", 12, 13) >= 0.75;
     assert advocate_objection(12, "PERSONAL", 1, 1) == 0.0;
     assert may_freeze("APPROVE") and not may_freeze("KEEP_OPEN") and not may_freeze("");
+}
+
+# Runs last (tests run in file order on Jac 0.16): leave the shared graph as we found it,
+# so other test files (A's War Room / seed tests) do not see our test stories.
+test "zz clean up this file's test stories" {
+    forget_test_graph(True);
+    assert True;
 }

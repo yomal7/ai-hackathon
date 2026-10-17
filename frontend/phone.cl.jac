@@ -1,10 +1,11 @@
 # Elder's banking app (C): calm, big text, big buttons. Phone frame on a laptop, full screen on a real phone.
 # /phone?citizen=c_seeya (default) or c_kamala. Follows the citizen's latest request, so scenarios run from
-# the control panel show up here too. The Scam-Breaker card comes in M4.
+# the control panel show up here too. While the Scam-Breaker is active it takes over the screen (M4).
 import from react { useEffect }
 import from "@jac/runtime" { useLocation }
 import from .i18n { t, tf, money, known_key }
 import from .ui { Header, Card, Bar, theme, pressure_color, pressure_key, last_report, query_param, only_digits }
+import from .scam_breaker { ScamBreakerCard }
 
 sv import from ..walkers.api { get_phone, set_language, start_request, telemetry_update, submit_request }
 
@@ -191,6 +192,8 @@ def:pub Phone() -> JsxElement {
         return <PhoneFrame><p style={{"padding": "24px"}}>{t("common.loading", lang)}</p></PhoneFrame>;
     }
     screen = data["screen"] as str;
+    sb = (data["scam_breaker"] or {}) as dict[str, any];
+    show_breaker = step == "" and bool(sb["active"]);
     show_result = step == "" and screen in RESULTS and screen != dismissed;
     title_key = [a["key"] for a in ACTIONS if a["action"] == action][0];
     return <PhoneFrame>
@@ -235,6 +238,8 @@ def:pub Phone() -> JsxElement {
                     onClick={lambda (e: MouseEvent) { confirm(); }}>
                     {t("transfer.checking", lang) if step == "checking" else t("transfer.confirm", lang)}
                 </button>
+            } elif show_breaker {
+                <ScamBreakerCard sb={sb} request_id={watch} lang={lang} onAnswered={load} />
             } elif show_result {
                 <ResultCard screen={screen} lang={lang} message={(data["message"] or "") as str} onHome={go_home} />
             } else {

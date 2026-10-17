@@ -63,8 +63,8 @@ def:pub speak(text: str, lang: str, voices: list[dict[str, str]]) -> bool {
         return False;
     }
     chosen = pick_voice(voices, lang);
-    own = bool(chosen);
-    if not own {
+    native = bool(chosen);              # a voice in the asked language exists
+    if not native {
         chosen = pick_voice(voices, "en");
     }
     utter: any = new(SpeechSynthesisUtterance, text);  # jac:ignore[E1053]
@@ -77,5 +77,5 @@ def:pub speak(text: str, lang: str, voices: list[dict[str, str]]) -> bool {
     }
     engine.cancel();
     engine.speak(utter);
-    return own;
+    return native;
 }
