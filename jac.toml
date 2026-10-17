@@ -1,0 +1,12 @@
+# TEMPORARY (Person B, branch b-ai) — Person A's jac.toml replaces this on merge.
+# A: please keep the [plugins.byllm.model] block below in the real file.
+[project]
+name = "rakshaka"
+version = "0.1.0"
+description = "Rakshaka — AI agent network protecting elders from phone scams (simulation)"
+entry-point = "main.jac"
+
+[dependencies]
+
+[plugins.byllm.model]
+default_model = "gemini/gemini-3.5-flash-lite"

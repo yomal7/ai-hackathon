@@ -10,25 +10,12 @@ import from graph.edges { Made, Checked, HasProposal, ProtectedBy, Raised }
 import from ai.jev { jev_read_reply, jev_last }
 import from ai.llm_calls { scam_questions }
 import from ai.lang { fixed_text, fmt_rs, safe_lang }
+import from agents.network.net_common { find_request }
 import from ai.fallback { round2 }
 
 glob _warnings: dict[str, str] = {};     # request id -> warning line shown to the elder
 
 # ---------- graph lookups ----------
-
-"""Find a Request node by its id (walks the graph from root)."""
-def find_request(request_id: str) -> Request | None {
-    seen: set[int] = set();
-    todo: list = [root];
-    while todo {
-        n = todo.pop();
-        if id(n) in seen { continue; }
-        seen.add(id(n));
-        if isinstance(n, Request) and n.id == request_id { return n; }
-        todo.extend([n -->]);
-    }
-    return None;
-}
 
 def citizen_of(req: Request) -> Citizen | None {
     found = [n for n in [req <-:Made:<-] if isinstance(n, Citizen)];
