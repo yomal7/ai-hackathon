@@ -33,30 +33,13 @@ enum JevDecision: str {
     BLOCK = "BLOCK"
 }
 
-# Typed LLM outputs (System 2). Code copies them into dicts / nodes.
-obj ScamQuestions {
-    has language: str;
-    has questions: list[str];
-    has warning: str;
-}
-
-obj Card {
-    has language: str;
-    has title: str;
-    has lines: list[str];
-}
-
+# Public result of learn_pattern(). (The LLM's own output objs live in ai/llm_calls.jac,
+# because byllm needs them in the same file as the by llm() function.)
 obj ScamPatternDraft {
     has name: str;
     has features: list[str];
     has phrases: list[str];
 }
 
-# Typed tool choice — fallback when the LLM does not call tools itself.
-obj Action {
-    has tool: str;
-    has args: dict[str, str];
-    has why: str;
-}
 
 glob LANGS: list[str] = ["si", "ta", "en"];

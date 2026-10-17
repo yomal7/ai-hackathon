@@ -17,6 +17,16 @@ def detect_language(text: str) -> str {
     return "si" if si >= ta else "ta";
 }
 
+"""True if text uses no OTHER Indian script than its own (e.g. no Malayalam inside Tamil)."""
+def script_clean(text: str, lang: str) -> bool {
+    own = {"si": (0x0D80, 0x0DFF), "ta": (0x0B80, 0x0BFF)}.get(lang, (0, 0));
+    for ch in text {
+        c = ord(ch);
+        if 0x0900 <= c and c <= 0x0DFF and not (own[0] <= c and c <= own[1]) { return False; }
+    }
+    return True;
+}
+
 def safe_lang(lang: str) -> str {
     return lang if lang in ["si", "ta", "en"] else "en";
 }

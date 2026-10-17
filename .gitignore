@@ -9,3 +9,6 @@ __pycache__/
 *.session
 node_modules/
 dist/
+
+# LLM answer cache (speeds up demo re-runs)
+.cache/

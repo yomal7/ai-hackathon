@@ -5,11 +5,14 @@ import time;
 import from ai.types { RiskVector }
 import from ai.jev { jev_request_vector, jev_pressure, jev_pattern, jev_read_reply, jev_mule_scores, jev_call, jev_last }
 import from ai.llm_calls { scam_questions, guardian_card, analyst_card, debrief, arbiter_decide, learn_pattern }
-import from ai.lang { detect_language, scam_keywords_hit }
+import from ai.lang { detect_language, scam_keywords_hit, script_clean }
+import from ai.llm_guard { text_ok, numbers_ok, run_llm }
 
-# These tests check the code fallbacks, so they run with NO Jev key (no network).
+# These tests check the code fallbacks, so they run with NO Jev or LLM key (no network).
 with entry {
-    os.environ["TYPESAFE_API_KEY"] = "";
+    for k in ["TYPESAFE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"] {
+        os.environ[k] = "";
+    }
 }
 
 glob SEEYA_HABITS: list[dict] = [
@@ -146,4 +149,25 @@ test "timeout: a slow Jev answer falls back fast" {
     assert rv.source == "fallback";
     assert rv.decision == "HOLD";
     assert ms < 300, f"took {ms} ms";
+}
+
+test "LLM answer checks: language, length, script, numbers" {
+    assert text_ok("ඔබ දැන් දුරකථනයෙන් කතා කරනවාද?", "si");
+    assert not text_ok("Are you on the phone?", "si");                 # wrong language
+    assert not text_ok("", "en") and not text_ok(None, "en");
+    assert not text_ok("x" * 300, "en", 220);                           # too long
+    assert not script_clean("ரக்ஷகா രക്ഷ", "ta");                        # Malayalam inside Tamil
+    assert script_clean("ரக்ஷகா 1 நொடியில்", "ta");
+    assert numbers_ok("Rs 4,200,000 and 2 elders", "amount 4200000, others 2");
+    assert not numbers_ok("Rs 5,000,000", "amount 4200000");             # LLM invented a number
+}
+
+def _never_called() -> dict {
+    return {"a": 1};
+}
+
+test "no LLM key: run_llm returns None and functions use fixed text" {
+    assert run_llm("x", {"a": 1}, _never_called) is None;
+    assert scam_questions("x", "ta")["source"] == "fallback";
+    assert arbiter_decide([], {})["source"] == "fallback";
 }

@@ -3,40 +3,29 @@ Every function asks Jev first. On no key, timeout or error it uses the code rule
 in ai/fallback.jac — same return type, source = "fallback". The demo never waits
 longer than JEV_TIMEOUT_MS (default 800 ms)."""
 
-import os;
 import json;
 import time;
-import logging;
 import hashlib;
 import httpx;
-import dotenv;
 import from concurrent.futures { ThreadPoolExecutor }
+import from ai.env { env }
 import from ai.types { RiskVector }
 import from ai.lang { detect_language, scam_keywords_hit }
 import from ai.fallback {
     fb_request_vector, fb_pressure, fb_pattern, fb_read_reply, fb_mule_score,
-    state_text, to_float, round2
+    state_text, to_float, round2, as_str
 }
 
 glob JEV_URL: str = "https://api.typesafe.ai/v1/systemone";
-glob _env_loaded: bool = dotenv.load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"));
 glob _client: httpx.Client = httpx.Client(timeout=5.0);
 glob _pool: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=4);
 glob _cache: dict[str, dict] = {};
 glob LAST: dict[str, dict] = {};     # per function: {"source", "ms"} of the latest call
 
-with entry {
-    logging.getLogger("httpx").setLevel("WARNING");
-}
-
 # ---------- the one HTTP helper ----------
 
 def _timeout_s() -> float {
-    return to_float(os.environ.get("JEV_TIMEOUT_MS", "800"), 800.0) / 1000.0;
-}
-
-def _as_str(o: any) -> str {
-    return str(o);
+    return to_float(env("JEV_TIMEOUT_MS", "800"), 800.0) / 1000.0;
 }
 
 def _post(body: dict, key: str) -> dict | None {
@@ -48,10 +37,10 @@ def _post(body: dict, key: str) -> dict | None {
 """POST to Jev. Returns {"answers": {...}, "ms": int} or None (no key, timeout, error).
 Successful answers are cached, so the same question twice is instant."""
 def jev_call(state: dict, questions: dict) -> dict | None {
-    key = os.environ.get("TYPESAFE_API_KEY", "").strip();
+    key = env("TYPESAFE_API_KEY");
     if not key { return None; }
     body = {"model": "jev-latest", "state": state, "questions": questions};
-    ck = hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False, default=_as_str).encode()).hexdigest();
+    ck = hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False, default=as_str).encode()).hexdigest();
     if ck in _cache { return {"answers": _cache[ck], "ms": 0, "cached": True}; }
     t0 = time.perf_counter();
     try {
@@ -68,7 +57,7 @@ def jev_call(state: dict, questions: dict) -> dict | None {
 
 """Open the connection early (call once at server start) so the first real call is fast."""
 def jev_warmup() -> None {
-    if os.environ.get("TYPESAFE_API_KEY", "").strip() {
+    if env("TYPESAFE_API_KEY") {
         _pool.submit(jev_call, {"warmup": True}, {"ok": {"type": "noul", "instructions": "Is this a warm-up?"}});
     }
 }

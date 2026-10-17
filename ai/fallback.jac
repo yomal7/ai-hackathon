@@ -14,6 +14,11 @@ def state_text(value: any) -> str {
     return "";
 }
 
+"""Any value -> str (for json.dumps default=)."""
+def as_str(o: any) -> str {
+    return str(o);
+}
+
 """Any value -> float, or fallback_val if it is not a number."""
 def to_float(v: any, fallback_val: float = 0.0) -> float {
     if isinstance(v, bool) { return float(v); }
