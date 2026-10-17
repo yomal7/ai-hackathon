@@ -53,8 +53,12 @@ obj FakeState {
         alerts: dict[str, FakeAlert] = {},
         langs: dict[str, str] = {},
         analyst_answers: dict[str, str] = {},
-        last_request: str = "";
+        last_request: str = "",
+        device: dict[str, any] = {};    # simulated phone signals; every new request starts with them
 }
+
+# Payees each citizen has paid before (anything else is a new payee).
+glob KNOWN_PAYEES: list[str] = ["CEB-ELECTRICITY", "KANDY-GENERAL-HOSPITAL", "NWSDB-WATER"];
 
 glob STATE: FakeState = FakeState();
 
@@ -100,21 +104,39 @@ def fake_pressure(telemetry: dict[str, any], reference: str) -> int {
     return int(jev_pressure(telemetry, {"reference_text": reference}).coached * 100);
 }
 
-"""Start a request; returns its id."""
+"""Request id for '' (latest), 'latest:<citizen_id>' or a real id; '' if none."""
+def fake_resolve(request_id: str) -> str {
+    if not request_id {
+        return STATE.last_request;
+    }
+    if request_id.startswith("latest:") {
+        citizen = request_id.split(":", 1)[1];
+        mine = [r.id for r in STATE.requests.values() if r.citizen == citizen];
+        return mine[-1] if mine else "";
+    }
+    return request_id if request_id in STATE.requests else "";
+}
+
+"""Start a request with the current device signals; returns its id."""
 def fake_start(citizen_id: str, action: str, amount: int, payee: str, reference: str) -> str {
     rid = f"req_{STATE.next_id}";
     STATE.next_id += 1;
-    STATE.requests[rid] = FakeRequest(id=rid, citizen=citizen_id, action=action, amount=amount, payee=payee, reference=reference);
+    signals = {**STATE.device, "new_payee": payee not in KNOWN_PAYEES};
+    STATE.requests[rid] = FakeRequest(id=rid, citizen=citizen_id, action=action, amount=amount, payee=payee, reference=reference,
+                                      telemetry=signals, pressure=fake_pressure(signals, reference));
     STATE.last_request = rid;
     return rid;
 }
 
-"""Merge new device signals into the request; returns the new pressure."""
+"""New device signals: kept on the device and merged into the open request ('' = latest draft).
+Returns the pressure of that request, or of the device alone when no draft is open."""
 def fake_telemetry(request_id: str, signals: dict[str, any]) -> int {
-    if request_id not in STATE.requests {
-        return 0;
+    STATE.device = {**STATE.device, **signals};
+    rid = fake_resolve(request_id);
+    req = STATE.requests.get(rid, None);
+    if req is None or (not request_id and req.status != "DRAFT") {
+        return fake_pressure(STATE.device, "");
     }
-    req = STATE.requests[request_id];
     req.telemetry = {**req.telemetry, **signals};
     req.pressure = fake_pressure(req.telemetry, req.reference);
     return req.pressure;
@@ -133,7 +155,7 @@ def fake_ruling(req: FakeRequest) -> dict[str, any] {
     if req.status == "BLOCKED" {
         return ruling("BLOCK", "Stopped: confirmed scam or stolen password", "R2", "HIGH", 180, False, True);
     }
-    if req.status == "STEP_UP" {
+    if req.status == "STEP_UP" or (req.status == "DRAFT" and req.pressure < 40) {
         return ruling("STEP_UP", "Council deadlock: unusual time vs known hospital", "R5", "MEDIUM", 2300, True, False);
     }
     return ruling("HOLD", "Coached transfer of life savings to a mule-ring account", "R3", "HIGH", 412, False, True);
@@ -143,10 +165,11 @@ glob STATUS_OF: dict[str, str] = {"ALLOW": "ALLOWED", "BLOCK": "BLOCKED", "STEP_
 
 """Submit a request; returns the ruling."""
 def fake_submit(request_id: str) -> dict[str, any] {
-    if request_id not in STATE.requests {
+    rid = fake_resolve(request_id);
+    if not rid {
         return fake_ruling(FakeRequest(id="", citizen="c_seeya", action="BREAK_FD", amount=4200000, payee="", reference="", status="HELD"));
     }
-    req = STATE.requests[request_id];
+    req = STATE.requests[rid];
     result = fake_ruling(req);
     req.status = STATUS_OF.get(str(result["decision"]), "HELD");
     if req.status == "HELD" {
@@ -186,7 +209,7 @@ def _questions(citizen: str) -> dict[str, any] {
 
 """Store a Scam-Breaker answer; returns the next question or None."""
 def fake_scam_answer(request_id: str, q: int, answer: str) -> str | None {
-    req = STATE.requests.get(request_id, None);
+    req = STATE.requests.get(fake_resolve(request_id), None);
     if req is None {
         return None;
     }
@@ -228,14 +251,16 @@ def fake_reset() {
 
 glob SCREEN_OF: dict[str, str] = {"DRAFT": "FORM"};
 
-"""What the elder's phone shows ('' = latest request)."""
+"""What the elder's phone shows ('' = latest request, 'latest:<citizen_id>' = that citizen's latest).
+With no request yet: HOME, with the pressure of the device signals alone."""
 def fake_phone(request_id: str) -> dict[str, any] {
-    req = STATE.requests.get(request_id or STATE.last_request, None);
-    citizen = req.citizen if req is not None else "c_seeya";
+    req = STATE.requests.get(fake_resolve(request_id), None);
+    asked = request_id.split(":", 1)[1] if request_id.startswith("latest:") else "c_seeya";
+    citizen = req.citizen if req is not None else (asked if asked in PEOPLE else "c_seeya");
     lang = fake_lang(citizen);
     person = PEOPLE[citizen];
     screen = SCREEN_OF.get(req.status, req.status) if req is not None else "HOME";
-    pressure = req.pressure if req is not None else 0;
+    pressure = req.pressure if req is not None else fake_pressure(STATE.device, "");
     breaker: dict[str, any] = {"active": False, "language": lang, "questions": [], "warning": "", "answers": []};
     if req is not None and req.status == "HELD" and pressure >= 70 {
         sq = _questions(citizen);

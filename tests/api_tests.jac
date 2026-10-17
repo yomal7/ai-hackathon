@@ -122,6 +122,33 @@ test "guardian reject turns the S3 hold into a block" {
     assert obj_of(room["counters"])["protected_rs"] == 4200000;
 }
 
+test "device signals set before a request carry into it (S3 typed on the phone)" {
+    one(root spawn reset_demo());
+    calm = one(root spawn get_phone(request_id="latest:c_seeya"));
+    assert calm["screen"] == "HOME";
+    device = one(root spawn telemetry_update(request_id="", signals={"on_call": True, "pasted_account": True, "hesitation_ms": 9000}));
+    assert int(device["pressure"]) > int(calm["pressure"]), "on a call + pasted account must raise pressure";
+    rid = str(one(root spawn start_request(citizen_id="c_seeya", action="BREAK_FD", amount=4200000, payee="LDB-77821",
+                                           reference="CID said move to safe account"))["request_id"]);
+    phone = one(root spawn get_phone(request_id="latest:c_seeya"));
+    assert phone["screen"] == "FORM";
+    assert int(phone["pressure"]) >= 70, "device signals + 'safe account' note must be high pressure";
+    ruling = obj_of(one(root spawn submit_request(request_id=rid))["ruling"]);
+    assert ruling["decision"] == "HOLD" and ruling["locked"];
+    assert one(root spawn get_phone(request_id=rid))["screen"] == "HELD";
+}
+
+test "a small known bill is allowed and latest:<citizen> follows the right person" {
+    one(root spawn reset_demo());
+    rid = str(one(root spawn start_request(citizen_id="c_seeya", action="BILL_PAY", amount=4500, payee="CEB-ELECTRICITY",
+                                           reference="Electricity bill"))["request_id"]);
+    assert obj_of(one(root spawn submit_request(request_id=rid))["ruling"])["decision"] == "ALLOW";
+    one(root spawn run_scenario(name="S4"));
+    assert one(root spawn get_phone(request_id="latest:c_seeya"))["screen"] == "ALLOWED";
+    kamala = one(root spawn get_phone(request_id="latest:c_kamala"));
+    assert kamala["screen"] == "HELD" and kamala["fd"] == 2600000;
+}
+
 test "every scenario returns a request id" {
     for name in ["S1", "S2", "S3", "S4", "S5"] {
         keys_are(one(root spawn run_scenario(name=name)), ["request_id"]);

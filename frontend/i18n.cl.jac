@@ -43,6 +43,11 @@ glob EN: dict[str, str] = {
     "form.otp": "OTP code",
     "form.otp_hint": "We sent a 6-digit code to your phone (demo: any 6 digits)",
     "form.missing": "Please fill in the amount and the account.",
+    "form.otp_wrong": "Please enter the 6-digit code.",
+    "form.cancel": "Cancel",
+    "form.summary": "You are sending {amount} to {payee}.",
+    "form.account_hint": "e.g. LDB-77821",
+    "result.back_home": "Back to home",
     "transfer.continue": "Continue",
     "transfer.confirm": "Confirm and send",
     "transfer.checking": "Checking your request…",
@@ -93,6 +98,24 @@ glob EN: dict[str, str] = {
     "tele.no_voice": "none — English voice + big text",
     "tele.open_phone": "Elder's phone",
     "tele.open_guardian": "Guardian's phone",
+    "tele.typing_change": "Typing style changed",
+    "tele.elder": "Elder",
+    "tele.live": "Live phone",
+    "tele.screen_now": "Phone screen",
+    "tele.pressure_now": "Pressure",
+    "tele.test_voice": "Test",
+    "tele.voice_count": "{n} voices",
+    "tele.voice_sample": "Your money is safe. Please do not send money while someone is on the phone with you.",
+    "tele.lang_name.si": "Sinhala",
+    "tele.lang_name.ta": "Tamil",
+    "tele.lang_name.en": "English",
+    "tele.qr_title": "Open on a real phone",
+    "tele.base_url": "Address phones can reach (this laptop's Wi-Fi IP)",
+    "tele.qr_hint": "Scan with a phone on the same Wi-Fi.",
+    "tele.qr.phone_seeya": "Seeya's phone",
+    "tele.qr.phone_kamala": "Kamala's phone",
+    "tele.qr.guardian_dilshan": "Dilshan's phone",
+    "tele.qr.guardian_priya": "Priya's phone",
     "scenario.S1": "S1 Normal day",
     "scenario.S2": "S2 Stolen password",
     "scenario.S3": "S3 The scam call",
@@ -169,13 +192,15 @@ glob EN: dict[str, str] = {
 # Sinhala - to be checked by a native speaker. Missing keys use English for now.
 glob SI: dict[str, str] = {
     "sim.banner": "අනුකරණය — කල්පිත දත්ත",
-    "app.name": "රක්ෂක"
+    "app.name": "රක්ෂක",
+    "tele.voice_sample": "ඔබේ මුදල් ආරක්ෂිතයි. කවුරුහරි දුරකථනයෙන් කතා කරන අතරතුර මුදල් යවන්න එපා."
 };
 
 # Tamil - to be checked by a native speaker. Missing keys use English for now.
 glob TA: dict[str, str] = {
     "sim.banner": "உருவகப்படுத்தல் — கற்பனைத் தரவு",
-    "app.name": "ரக்ஷகா"
+    "app.name": "ரக்ஷகா",
+    "tele.voice_sample": "உங்கள் பணம் பாதுகாப்பாக உள்ளது. யாராவது தொலைபேசியில் பேசும்போது பணம் அனுப்ப வேண்டாம்."
 };
 
 glob _warned: dict[str, bool] = {};
