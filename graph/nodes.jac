@@ -153,7 +153,7 @@ node ScamCheck(RNode) {
 node ScamPattern(RNode) {
     has name: str;
     has features: list[str] = [];
-    has phrases: dict[str, list[str]] = {};   # {"si": [...], "ta": [...], "en": [...]}
+    has phrases: list[str] = [];              # scam phrases in si / ta / en / Singlish mixed
     has learned_from: str = "";               # request id
     has times_matched: int = 0;
 }

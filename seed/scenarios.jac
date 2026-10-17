@@ -6,6 +6,7 @@ import from seed.banks { seed_banks }
 import from seed.people { seed_places, seed_people }
 import from seed.money { seed_money, layout_canvas }
 import from agents.council.arbiter { RunCouncil }
+import from agents.phone.coercion_sentinel { CoercionSentinel }
 
 # Scam reference texts the scenarios type into the "reference" box.
 # si / ta: to be checked by a native speaker.
@@ -21,12 +22,16 @@ glob SCAM_REFERENCES: dict[str, str] = {
     "tanglish_customs": "customs fee kattanum"
 };
 
-# Telemetry an elder on a scam call produces. S3 / S4 replay these steps one by one (M2).
-glob SCAM_CALL_STEPS: list[dict[str, any]] = [
-    {"hesitation_ms": 12000, "backtracks": 4},
-    {"pasted_account": True, "new_payee": True},
-    {"on_call": True, "typing_change": True}
-];
+# What the phone sees during a scam call, step by step: hesitation -> pasted account -> on a call -> the note.
+# Each step goes through the Coercion Sentinel, so the pressure meter climbs.
+def scam_call_steps(note: str) -> list[dict[str, any]] {
+    return [
+        {"hesitation_ms": 12000, "backtracks": 4},
+        {"pasted_account": True, "new_payee": True},
+        {"on_call": True, "typing_change": True},
+        {"reference_text": note}
+    ];
+}
 
 # S1-S5 (section 9). Every amount, time and text is fictional.
 glob SCENARIOS: dict[str, dict[str, any]] = {
@@ -36,11 +41,11 @@ glob SCENARIOS: dict[str, dict[str, any]] = {
            "payee": "CDB-63390", "reference": "", "time": "02:13", "place": "Colombo",
            "new_device": "Linux laptop", "earlier_login": {"time": "02:03", "place": "Kandy"}},
     "S3": {"title": "The scam call", "citizen": "c_seeya", "action": "BREAK_FD", "amount": 4200000,
-           "payee": "LDB-77821", "reference": SCAM_REFERENCES["si_safe_account"], "time": "14:30",
-           "steps": SCAM_CALL_STEPS},
+           "payee": "LDB-77821", "reference": "", "time": "14:30",
+           "steps": scam_call_steps(SCAM_REFERENCES["si_safe_account"])},
     "S4": {"title": "Network immunity", "citizen": "c_kamala", "action": "BREAK_FD", "amount": 2600000,
-           "payee": "IDB-31877", "reference": SCAM_REFERENCES["ta_safe_account"], "time": "14:40",
-           "steps": SCAM_CALL_STEPS},
+           "payee": "IDB-31877", "reference": "", "time": "14:40",
+           "steps": scam_call_steps(SCAM_REFERENCES["ta_safe_account"])},
     "S5": {"title": "Hospital at 1 AM", "citizen": "c_seeya", "action": "BILL_PAY", "amount": 180000,
            "payee": "LDB-10004", "reference": "Kandy General Hospital - emergency admission", "time": "01:00"}
 };
@@ -84,21 +89,25 @@ def build_scenario_request(name: str) -> Request | None {
     if "new_device" in sc {
         device = Device(id=f"d_new_{name.lower()}", kind=str(sc["new_device"]), first_seen="today", trusted=False);
     }
-    # Final telemetry = all steps merged. RunScenario replays them one by one from M2.
-    telemetry: dict[str, any] = {};
-    steps = (sc["steps"] if "steps" in sc else []) as list[dict[str, any]];
-    for step in steps {
-        telemetry.update(step);
-    }
+    # Telemetry starts empty; RunScenario (or the live phone screen) sends the steps.
     return create_request(
         cid, str(sc["action"]), sc["amount"] as int, str(sc["payee"]), str(sc["reference"]),
-        str(sc["time"]), device, str(sc["place"]) if "place" in sc else "", telemetry
+        str(sc["time"]), device, str(sc["place"]) if "place" in sc else ""
     );
 }
 
-"""Run demo scenario S1..S5: build its Request, then spawn the Bank Council on it."""
+"""Telemetry steps of a scenario (empty for S1, S2, S5)."""
+def scenario_steps(name: str) -> list[dict[str, any]] {
+    sc = SCENARIOS.get(name, {});
+    return (sc["steps"] if "steps" in sc else []) as list[dict[str, any]];
+}
+
+"""Run demo scenario S1..S5: build its Request, replay its phone telemetry, then spawn the Bank Council.
+live=True: only build the Request and report the steps - the phone screen replays them with
+telemetry_update and then calls submit_request, so the pressure meter climbs on screen."""
 walker RunScenario {
     has name: str = "S1";
+    has live: bool = False;
     has request_id: str = "";
 
     can run with Root entry {
@@ -110,6 +119,14 @@ walker RunScenario {
         }
         self.request_id = req.id;
         add_timeline("SYSTEM", f"Scenario {self.name}: {SCENARIOS[self.name]['title']} ({req.id})");
+        steps = scenario_steps(self.name);
+        if self.live {
+            report {"request_id": req.id, "steps": steps};
+            disengage;
+        }
+        for step in steps {
+            req spawn CoercionSentinel(signals=step);
+        }
         req spawn RunCouncil();
         report {"request_id": req.id};
     }

@@ -1,8 +1,8 @@
 # Scam-Breaker: talks to the elder in their language. STUB written by A - B owns and replaces this file (B)
 
-"""Spawned by RunCouncil on a HELD Request with high pressure."""
+"""Spawned by RunCouncil on a HELD Request with high pressure (B's real walker asks the questions)."""
 walker ScamBreakerStart {
-    has language: str = "si";
+    has situation: str = "";             # English summary written by RunCouncil
 }
 
 """Store the elder's answer, Jev reading and a new Proposal."""
