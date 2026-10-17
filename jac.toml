@@ -5,6 +5,9 @@ description = "Rakshaka - an AI agent network that stops scammers from emptying 
 entry-point = "main.jac"
 kind = "fullstack"
 
+[dependencies]
+python-dotenv = ">=1.0.0"
+
 [dependencies.npm]
 react = "^18.2.0"
 react-dom = "^18.2.0"

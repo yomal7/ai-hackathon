@@ -40,7 +40,10 @@ import ai.llm_calls;
 import ai.lang;
 
 # Public API (C). Only `import from X { names }` registers REST endpoints - C tells A the names to add.
-import from walkers.api { ping }
+import from walkers.api {
+    ping, get_war_room, get_phone, get_guardian, get_story, start_request, telemetry_update, submit_request,
+    scam_answer, guardian_answer, analyst_answer, set_language, run_scenario, reset_demo
+}
 
 # Keys come only from the environment; .env is loaded if present (never committed).
 with entry {
@@ -49,9 +52,9 @@ with entry {
 
 # Client UI (C builds the screens)
 cl {
-    import from .frontend.war_room { WarRoom }
+    import from .frontend.app { App }
 
     def:pub app -> JsxElement {
-        return <WarRoom/>;
+        return <App/>;
     }
 }
