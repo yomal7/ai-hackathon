@@ -1,10 +1,11 @@
 # Elder's banking app (C): calm, big text, big buttons. Phone frame on a laptop, full screen on a real phone.
 # /phone?citizen=c_seeya (default) or c_kamala. Follows the citizen's latest request, so scenarios run from
-# the control panel show up here too. The Scam-Breaker card comes in M4.
+# the control panel show up here too. While the Scam-Breaker is active it takes over the screen (M4).
 import from react { useEffect }
 import from "@jac/runtime" { useLocation }
-import from .i18n { t, tf, money }
-import from .ui { Header, Card, Bar, theme, pressure_color, pressure_key, first_report, query_param, only_digits }
+import from .i18n { t, tf, money, known_key }
+import from .ui { Header, Card, Bar, theme, pressure_color, pressure_key, last_report, query_param, only_digits }
+import from .scam_breaker { ScamBreakerCard }
 
 sv import from ..walkers.api { get_phone, set_language, start_request, telemetry_update, submit_request }
 
@@ -14,12 +15,13 @@ glob NAMES: dict[str, str] = {"c_seeya": "Seeya", "c_kamala": "Kamala"};
 glob ACTIONS: list[dict[str, str]] = [
     {"action": "BREAK_FD", "key": "phone.break_fd", "payee": "", "reference": ""},
     {"action": "TRANSFER", "key": "phone.transfer", "payee": "", "reference": ""},
-    {"action": "BILL_PAY", "key": "phone.pay_bill", "payee": "CEB-ELECTRICITY", "reference": "Electricity bill"}
+    {"action": "BILL_PAY", "key": "phone.pay_bill", "payee": "LDB-10001", "reference": "Electricity bill"}
 ];
 
 # Result screens: i18n key prefix + colour.
 glob RESULTS: dict[str, dict[str, str]] = {
     "ALLOWED": {"key": "result.allowed", "color": "#22c55e"},
+    "DONE": {"key": "result.allowed", "color": "#22c55e"},
     "BLOCKED": {"key": "result.blocked", "color": "#ef4444"},
     "HELD": {"key": "result.held", "color": "#f59e0b"},
     "STEP_UP": {"key": "result.step_up", "color": "#f59e0b"}
@@ -55,11 +57,11 @@ def:pub PressureMeter(value: int, lang: str) -> JsxElement {
 }
 
 """Result card (allowed / blocked / held / step-up) in the elder's language."""
-def:pub ResultCard(screen: str, lang: str, onHome: Callable[[], None]) -> JsxElement {
+def:pub ResultCard(screen: str, lang: str, message: str, onHome: Callable[[], None]) -> JsxElement {
     result = RESULTS[screen];
     return <Card accent={result["color"]}>
         <h3 style={{"margin": "0 0 6px", "fontSize": "28px", "color": result["color"]}}>{t(result["key"] + ".title", lang)}</h3>
-        <p style={{"fontSize": "22px", "margin": "0 0 14px"}}>{t(result["key"] + ".body", lang)}</p>
+        <p style={{"fontSize": "22px", "margin": "0 0 14px"}}>{t(message, lang) if known_key(message) else t(result["key"] + ".body", lang)}</p>
         <button style={{**BIG_BUTTON, "background": "#e2e8f0", "color": "#0f172a"}} onClick={lambda (e: MouseEvent) { onHome(); }}>
             {t("result.back_home", lang)}
         </button>
@@ -95,7 +97,7 @@ def:pub Phone() -> JsxElement {
     watch = rid or "latest:" + citizen;
 
     async def load() {
-        fresh = first_report(root spawn get_phone(request_id=watch));
+        fresh = last_report(root spawn get_phone(request_id=watch));
         if fresh {
             data = fresh;
             if not lang_set {
@@ -155,7 +157,7 @@ def:pub Phone() -> JsxElement {
         error = "";
         # Real signals measured on this phone, sent before the request so it starts with them.
         root spawn telemetry_update(request_id="", signals={"hesitation_ms": int(Date.now() - opened_at), "backtracks": backtracks});
-        started = first_report(root spawn start_request(citizen_id=citizen, action=action, amount=value,
+        started = last_report(root spawn start_request(citizen_id=citizen, action=action, amount=value,
                                                         payee=payee.strip(), reference=reference));
         rid = started["request_id"] as str;
         step = "otp";
@@ -190,6 +192,8 @@ def:pub Phone() -> JsxElement {
         return <PhoneFrame><p style={{"padding": "24px"}}>{t("common.loading", lang)}</p></PhoneFrame>;
     }
     screen = data["screen"] as str;
+    sb = (data["scam_breaker"] or {}) as dict[str, any];
+    show_breaker = step == "" and bool(sb["active"]);
     show_result = step == "" and screen in RESULTS and screen != dismissed;
     title_key = [a["key"] for a in ACTIONS if a["action"] == action][0];
     return <PhoneFrame>
@@ -234,8 +238,10 @@ def:pub Phone() -> JsxElement {
                     onClick={lambda (e: MouseEvent) { confirm(); }}>
                     {t("transfer.checking", lang) if step == "checking" else t("transfer.confirm", lang)}
                 </button>
+            } elif show_breaker {
+                <ScamBreakerCard sb={sb} request_id={watch} lang={lang} onAnswered={load} />
             } elif show_result {
-                <ResultCard screen={screen} lang={lang} onHome={go_home} />
+                <ResultCard screen={screen} lang={lang} message={(data["message"] or "") as str} onHome={go_home} />
             } else {
                 <h2 style={{"margin": "4px 0", "fontSize": "26px"}}>{tf("phone.hello", lang, {"name": NAMES[citizen] or citizen})}</h2>
                 <Card title={t("phone.balance", lang)}><div style={{"fontSize": "30px", "fontWeight": "800"}}>{money(data["balance"])}</div></Card>

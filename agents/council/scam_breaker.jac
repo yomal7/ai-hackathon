@@ -14,6 +14,8 @@ import from agents.network.net_common { find_request }
 import from ai.fallback { round2 }
 
 glob _warnings: dict[str, str] = {};     # request id -> warning line shown to the elder
+glob _spoken: dict[str, list[str]] = {}; # request id -> the questions in English (voice fallback)
+glob _warnings_en: dict[str, str] = {};  # request id -> the warning in English (voice fallback)
 
 # ---------- graph lookups ----------
 
@@ -93,6 +95,8 @@ walker ScamBreakerStart {
             here +>:Checked():+> ScamCheck(question=str(q), answer="", jev_reading=JevReading.NONE, language=Lang(lang));
         }
         _warnings[here.id] = str(res["warning"]);
+        _spoken[here.id] = [str(x) for x in list(res.get("questions_en") or [])];
+        _warnings_en[here.id] = str(res.get("warning_en") or "");
         report scam_breaker_state(here.id);
     }
 }
@@ -132,11 +136,21 @@ walker ScamAnswer {
 
 # ---------- state for screens ----------
 
-"""For get_phone(): {active, language, questions, warning, answers, readings, guardian_message}."""
+"""English lines the phone SPEAKS when the browser has no Sinhala / Tamil voice (the screen still shows
+the elder's language). They come from the same LLM call as the questions, so the meaning matches.
+Unknown (server restarted) -> [] and the phone does not speak a different question."""
+def spoken_english(req: Request, n: int) -> list[str] {
+    en = _spoken.get(req.id, []);
+    return en if len(en) == n else [];
+}
+
+"""For get_phone(): {active, language, questions, warning, answers, readings, guardian_message,
+spoken_en, warning_en}. spoken_en / warning_en: English voice fallback (M4)."""
 def scam_breaker_state(request_id: str) -> dict {
     req = find_request(request_id);
     if req is None {
-        return {"active": False, "language": "en", "questions": [], "warning": "", "answers": [], "readings": [], "guardian_message": ""};
+        return {"active": False, "language": "en", "questions": [], "warning": "", "answers": [], "readings": [], "guardian_message": "",
+                "spoken_en": [], "warning_en": ""};
     }
     checks = checks_of(req);
     lang = _lang_of(req);
@@ -149,7 +163,9 @@ def scam_breaker_state(request_id: str) -> dict {
         "warning": _warnings.get(req.id, fixed_text("sb_warning", lang)) if checks else "",
         "answers": [c.answer for c in checks],
         "readings": [c.jev_reading for c in checks],
-        "guardian_message": fixed_text("sb_guardian_asked", lang, {"guardian": g.name if g else ""}) if asked else ""
+        "guardian_message": fixed_text("sb_guardian_asked", lang, {"guardian": g.name if g else ""}) if asked else "",
+        "spoken_en": [c.question for c in checks] if lang == "en" else spoken_english(req, len(checks)),
+        "warning_en": (_warnings_en.get(req.id) or fixed_text("sb_warning", "en")) if checks else ""
     };
 }
 

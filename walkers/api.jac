@@ -1,31 +1,96 @@
 # Public REST API (C). walker:pub = POST /walker/<name>. Names and return shapes are FIXED (section 8).
-# Each endpoint uses FAKE data until A's / B's walker lands; then add its name to REAL.
-import from graph.views { war_room_data, phone_data, guardian_data }
-import from seed.scenarios { RunScenario, ResetDemo }
-import from agents.council.arbiter { ApplyGuardianAnswer }
-import from agents.council.scam_breaker { ScamAnswer }
+# Each endpoint calls A's / B's real walkers and functions (section 7). Remove a name from REAL to fall
+# back to walkers/fake_data.jac for that endpoint (demo safety net while a teammate's part is broken).
+#
+# Two conventions the screens rely on (handled here, so A's and B's code stays simple):
+#   request_id ""                -> the demo's current request
+#   request_id "latest:<cid>"    -> that citizen's newest request (Kamala's phone follows S4)
+#   telemetry_update with ""     -> the signals stay on the device; the next request starts with them
+import from operator { attrgetter }
+import from graph.nodes { Request, RequestStatus }
+import from graph.edges { Made, Owns, Paid }
+import from graph.queries { demo_state, find_citizen, find_request, create_request, set_person_language }
+import from graph.views { war_room_data, phone_data, guardian_data, story_data }
+import from seed.scenarios { RunScenario, ResetDemo, scenario_steps, ensure_seeded }
+import from agents.phone.coercion_sentinel { CoercionSentinel }
+import from agents.council.arbiter { RunCouncil, ApplyGuardianAnswer }
+import from agents.council.scam_breaker { ScamAnswer, scam_breaker_state }
 import from agents.network.network { ApplyAnalystAnswer }
+import from ai.jev { jev_pressure }
 import from ai.llm_calls { debrief }
 import from walkers.fake_data {
     fake_war_room, fake_phone, fake_guardian, fake_story, fake_start, fake_telemetry, fake_submit,
     fake_scam_answer, fake_guardian_answer, fake_analyst_answer, fake_set_language, fake_scenario, fake_reset
 }
 
-# Endpoints switched to the real walkers / functions (section 7). Empty = all fake.
-glob REAL: list[str] = [];
+# Endpoints that use the real walkers. All of them since M3.
+glob REAL: list[str] = [
+    "get_war_room", "get_phone", "get_guardian", "get_story", "start_request", "telemetry_update",
+    "submit_request", "scam_answer", "guardian_answer", "analyst_answer", "set_language", "run_scenario", "reset_demo"
+];
 
 glob LANG_CODES: list[str] = ["si", "ta", "en"];
 glob ACTIONS: list[str] = ["BILL_PAY", "TRANSFER", "BREAK_FD", "LOGIN"];
 glob SCENARIO_NAMES: list[str] = ["S1", "S2", "S3", "S4", "S5"];
+
+# Simulated phone signals set before a request exists (control panel toggles, the phone's own paste).
+# Changed in place (clear / update), so no `global` is needed (Jac 0.34 has no `global`).
+glob DEVICE: dict[str, any] = {};
 
 """True when this endpoint should call the real walker."""
 def _real(name: str) -> bool {
     return name in REAL;
 }
 
-"""First report of a spawned walker, or the fallback if it reported nothing."""
-def _first_report(reports: list[any], fallback: dict[str, any]) -> dict[str, any] {
-    return (reports[0] as dict[str, any]) if reports else fallback;
+# ---------------- helpers on A's graph ----------------
+
+"""The Request a screen means: '' = current, 'latest:<cid>' = that citizen's newest, else the id."""
+def resolve(request_id: str) -> Request | None {
+    if not request_id {
+        rid = demo_state().current_request;
+        return find_request(rid) if rid else None;
+    }
+    if request_id.startswith("latest:") {
+        c = find_citizen(request_id.split(":", 1)[1]);
+        mine = sorted([c ->:Made:->], key=attrgetter("id")) if c is not None else [];
+        return mine[-1] if mine else None;
+    }
+    return find_request(request_id);
+}
+
+"""Pressure 0-100 of the device signals alone (no request yet)."""
+def device_pressure() -> int {
+    return int(jev_pressure(DEVICE, {}).coached * 100);
+}
+
+"""Has this citizen paid this account before?"""
+def known_payee(citizen_id: str, payee: str) -> bool {
+    c = find_citizen(citizen_id);
+    if c is None {
+        return False;
+    }
+    for acct in [c ->:Owns:->] {
+        if payee in [b.id for b in [acct ->:Paid:->]] {
+            return True;
+        }
+    }
+    return False;
+}
+
+"""Elder's phone with no request yet: home screen, own balances, device pressure."""
+def home_phone(citizen_id: str) -> dict[str, any] {
+    c = find_citizen(citizen_id);
+    mine = [c ->:Owns:->] if c is not None else [];
+    return {
+        "language": str(c.language) if c is not None else "en", "screen": "HOME", "pressure": device_pressure(),
+        "balance": sum([a.balance for a in mine if not a.is_fd]), "fd": sum([a.balance for a in mine if a.is_fd]),
+        "scam_breaker": scam_breaker_state(""), "message": ""
+    };
+}
+
+"""Send changed signals through A's Coercion Sentinel on a request; returns the new pressure."""
+def sense(req: Request, signals: dict[str, any]) -> int {
+    return (req spawn CoercionSentinel(signals=signals)).pressure;
 }
 
 """Health check so we can see the server is up."""
@@ -40,16 +105,30 @@ walker:pub ping {
 """Everything the War Room shows."""
 walker:pub get_war_room {
     can go with Root entry {
+        if _real("get_war_room") {
+            ensure_seeded();    # first start of the server: build the demo graph once
+        }
         report war_room_data() if _real("get_war_room") else fake_war_room();
     }
 }
 
-"""What the elder's phone shows for one request ('' = latest)."""
+"""What the elder's phone shows ('' = current request, 'latest:<cid>' = that citizen's newest)."""
 walker:pub get_phone {
     has request_id: str = "";
 
     can go with Root entry {
-        report phone_data(self.request_id) if _real("get_phone") else fake_phone(self.request_id);
+        if not _real("get_phone") {
+            report fake_phone(self.request_id);
+            disengage;
+        }
+        ensure_seeded();
+        req = resolve(self.request_id);
+        if req is not None {
+            report phone_data(req.id);
+        } else {
+            citizen = self.request_id.split(":", 1)[1] if self.request_id.startswith("latest:") else "c_seeya";
+            report home_phone(citizen);
+        }
     }
 }
 
@@ -62,24 +141,27 @@ walker:pub get_guardian {
     }
 }
 
-"""Debrief in the chosen language + timeline of the last case."""
+"""Debrief + timeline of the current case. language '' = the elder's own language."""
 walker:pub get_story {
-    has language: str = "en";
+    has language: str = "";
 
     can go with Root entry {
-        lang = self.language if self.language in LANG_CODES else "en";
-        if _real("get_story") {
-            room = war_room_data();
-            report {"language": lang, "debrief": debrief(room, lang), "timeline": room["timeline"]};
-        } else {
-            report fake_story(lang);
+        if not _real("get_story") {
+            report fake_story(self.language or "en");
+            disengage;
         }
+        story = story_data();
+        if self.language in LANG_CODES and self.language != story["language"] and story["debrief"] {
+            room = war_room_data();
+            story = {**story, "language": self.language, "debrief": debrief((room["request"] or {}) as dict, self.language)};
+        }
+        report story;
     }
 }
 
 # ---------------- Actions ----------------
 
-"""Elder starts a request (draft). Reports {"request_id"}."""
+"""Elder starts a request (draft) with the current device signals. Reports {"request_id"}."""
 walker:pub start_request {
     has citizen_id: str = "c_seeya";
     has action: str = "TRANSFER";
@@ -90,17 +172,41 @@ walker:pub start_request {
     can go with Root entry {
         action = self.action if self.action in ACTIONS else "TRANSFER";
         amount = self.amount if self.amount > 0 else 0;
-        report {"request_id": fake_start(self.citizen_id, action, amount, self.payee, self.reference)};
+        if not _real("start_request") {
+            report {"request_id": fake_start(self.citizen_id, action, amount, self.payee, self.reference)};
+            disengage;
+        }
+        ensure_seeded();
+        req = create_request(self.citizen_id, action, amount, self.payee, self.reference);
+        if req is None {
+            report {"request_id": ""};
+            disengage;
+        }
+        sense(req, {**DEVICE, "new_payee": not known_payee(self.citizen_id, self.payee)});
+        report {"request_id": req.id};
     }
 }
 
-"""New simulated device signals. Reports {"pressure"} 0-100."""
+"""New simulated device signals. Reports {"pressure"} 0-100.
+request_id '' = keep them on the device and also apply them to the current request while it is a draft."""
 walker:pub telemetry_update {
     has request_id: str = "";
     has signals: dict[str, any] = {};
 
     can go with Root entry {
-        report {"pressure": fake_telemetry(self.request_id, self.signals)};
+        if not _real("telemetry_update") {
+            report {"pressure": fake_telemetry(self.request_id, self.signals)};
+            disengage;
+        }
+        if not self.request_id {
+            DEVICE.update(self.signals);
+        }
+        req = resolve(self.request_id);
+        if req is None or (not self.request_id and req.status != RequestStatus.DRAFT) {
+            report {"pressure": device_pressure()};
+        } else {
+            report {"pressure": sense(req, self.signals)};
+        }
     }
 }
 
@@ -109,7 +215,16 @@ walker:pub submit_request {
     has request_id: str = "";
 
     can go with Root entry {
-        report {"ruling": fake_submit(self.request_id)};
+        if not _real("submit_request") {
+            report {"ruling": fake_submit(self.request_id)};
+            disengage;
+        }
+        req = resolve(self.request_id);
+        if req is None {
+            report {"ruling": None};
+            disengage;
+        }
+        report {"ruling": (req spawn RunCouncil()).ruling};
     }
 }
 
@@ -120,12 +235,15 @@ walker:pub scam_answer {
     has answer: str = "";
 
     can go with Root entry {
-        if _real("scam_answer") {
-            res = root spawn ScamAnswer(request_id=self.request_id, q=self.q, answer=self.answer);
-            report _first_report(res.reports, {"next_question": None});
-        } else {
+        if not _real("scam_answer") {
             report {"next_question": fake_scam_answer(self.request_id, self.q, self.answer)};
+            disengage;
         }
+        req = resolve(self.request_id);
+        rid = req.id if req is not None else self.request_id;
+        root spawn ScamAnswer(request_id=rid, q=self.q, answer=self.answer);
+        questions = (scam_breaker_state(rid).get("questions") or []) as list[str];
+        report {"next_question": questions[self.q + 1] if self.q + 1 < len(questions) else None};
     }
 }
 
@@ -138,8 +256,7 @@ walker:pub guardian_answer {
         if self.answer not in ["REJECT", "APPROVE", "CALL"] {
             report {"ok": False};
         } elif _real("guardian_answer") {
-            root spawn ApplyGuardianAnswer(alert_id=self.alert_id, answer=self.answer);
-            report {"ok": True};
+            report {"ok": (root spawn ApplyGuardianAnswer(alert_id=self.alert_id, answer=self.answer)).ok};
         } else {
             report {"ok": fake_guardian_answer(self.alert_id, self.answer)};
         }
@@ -171,6 +288,8 @@ walker:pub set_language {
     can go with Root entry {
         if self.language not in LANG_CODES or not self.person_id {
             report {"ok": False};
+        } elif _real("set_language") {
+            report {"ok": set_person_language(self.person_id, self.language)};
         } else {
             fake_set_language(self.person_id, self.language);
             report {"ok": True};
@@ -178,17 +297,25 @@ walker:pub set_language {
     }
 }
 
-"""Run demo scenario S1..S5. Reports {"request_id"}."""
+"""Run demo scenario S1..S5. Reports {"request_id"}.
+live=True (extra, optional): only build the request and also report its telemetry "steps"; the control
+panel then replays them with telemetry_update and calls submit_request, so the pressure climbs on screen."""
 walker:pub run_scenario {
     has name: str = "S1";
+    has live: bool = False;
 
     can go with Root entry {
         name = self.name if self.name in SCENARIO_NAMES else "S1";
-        if _real("run_scenario") {
-            res = root spawn RunScenario(name=name);
-            report _first_report(res.reports, {"request_id": ""});
-        } else {
+        if not _real("run_scenario") {
             report {"request_id": fake_scenario(name)};
+            disengage;
+        }
+        DEVICE.clear();
+        run = root spawn RunScenario(name=name, live=self.live);
+        if self.live {
+            report {"request_id": run.request_id, "steps": scenario_steps(name)};
+        } else {
+            report {"request_id": run.request_id};
         }
     }
 }
@@ -196,6 +323,7 @@ walker:pub run_scenario {
 """Reset the whole demo. Reports {"ok"}."""
 walker:pub reset_demo {
     can go with Root entry {
+        DEVICE.clear();
         if _real("reset_demo") {
             root spawn ResetDemo();
         } else {
