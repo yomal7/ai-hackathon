@@ -1,0 +1,11 @@
+# secrets
+.env
+
+# jac / python build output
+__pycache__/
+*.pyc
+.jac/
+.jac_cache/
+*.session
+node_modules/
+dist/
