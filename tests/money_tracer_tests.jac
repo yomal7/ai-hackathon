@@ -4,7 +4,7 @@ No network: keys cleared, so mule scores come from the code fallback + traced-mo
 import os;
 import from graph.nodes { Account, Signal, Proposal }
 import from graph.edges { Emitted, HasProposal }
-import from agents.network.money_tracer { MoneyTracer, paid_out, paid_in }
+import from agents.network.money_tracer { MoneyTracer, paid_out, paid_in, stayed_parts }
 import from agents.network.net_common { find_account, reset_network, WALK, HELD, to_minutes }
 import from rules.network_rules { traced_score, network_verdict, advocate_objection, may_freeze }
 import from tests.net_story { forget_test_graph, build_story }
@@ -115,6 +115,14 @@ test "network rules are plain code" {
 
 # Runs last (tests run in file order on Jac 0.16): leave the shared graph as we found it,
 # so other test files (A's War Room / seed tests) do not see our test stories.
+test "two payments into one account: only the money that stayed is counted" {
+    # A's demo: Mallika Rs 650,000 and Rasheed Rs 380,000 both reach CDB-40213; then Rs 380,000 moves on.
+    assert stayed_parts([650000.0, 380000.0], [380000.0]) == [650000.0];
+    assert stayed_parts([100.0], [100.0]) == [];
+    assert stayed_parts([100.0, 100.0], [100.0]) == [100.0];
+    assert stayed_parts([1000.0], [990.0]) == [];        # about the same amount (fees) still counts as moved
+}
+
 test "zz clean up this file's test stories" {
     forget_test_graph(True);
     assert True;

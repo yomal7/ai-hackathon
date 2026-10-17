@@ -1,8 +1,8 @@
 # War Room council column (C): request card with pressure, one card per agent, the Arbiter's ruling, deadlock view.
-import from .i18n { t, money }
-import from .ui { Card, Bar, Badge, color_of, pressure_color, rows }
+import from .i18n { t, money, ops_lang }
+import from .ui { Card, Bar, Badge, Icon, Label, color_of, pressure_color, rows }
+import from .theme { INK, SIGNAL, DISPLAY, MONO }
 
-glob LANG: str = "en";
 glob RISKY: list[str] = ["STEP_UP", "HOLD", "BLOCK", "ASK_GUARDIAN", "FREEZE"];
 glob LAYER_OF: dict[str, str] = {
     "COERCION": "1", "PLACE_TIME": "2", "ROUTINE": "2", "MULE_RING": "2", "PATTERN": "2", "ADVOCATE": "2",
@@ -15,31 +15,31 @@ glob TEXT_FONT: str = "'Noto Sans Sinhala', 'Noto Sans Tamil', Inter, sans-serif
 def:pub source_label(source: str, ms: int) -> str {
     secs = f"{(ms / 1000):.2f} s";
     if source == "jev" {
-        return t("war.system1", LANG) + " · " + secs;
+        return t("war.system1", ops_lang()) + " · " + secs;
     }
     if source == "llm" {
-        return t("war.system2", LANG) + " · " + secs;
+        return t("war.system2", ops_lang()) + " · " + secs;
     }
     if source == "code" {
-        return t("war.rule_src", LANG) + " · " + str(ms) + " ms";
+        return t("war.rule_src", ops_lang()) + " · " + str(ms) + " ms";
     }
-    return t("war.fallback_src", LANG) + " · " + str(ms) + " ms";
+    return t("war.fallback_src", ops_lang()) + " · " + str(ms) + " ms";
 }
 
 """What people saw, in their own language (hover on the language badge)."""
 def:pub PeopleSaw(items: list[dict[str, any]]) -> JsxElement {
     return <div style={{
         "position": "absolute", "top": "100%", "right": "0", "zIndex": "20", "width": "380px", "marginTop": "6px",
-        "background": "#0b1120", "border": "1px solid #38bdf8", "borderRadius": "12px", "padding": "12px",
+        "background": "#0F0F0D", "border": "1px solid #7AA2FF", "borderRadius": "12px", "padding": "12px",
         "boxShadow": "0 12px 30px rgba(0,0,0,0.5)"
     }}>
-        <div style={{"fontSize": "12px", "color": "#94a3b8", "textTransform": "uppercase", "marginBottom": "6px"}}>{t("war.people_saw", LANG)}</div>
+        <div style={{"fontSize": "12px", "color": "#9C978C", "textTransform": "uppercase", "marginBottom": "6px"}}>{t("war.people_saw", ops_lang())}</div>
         {if len(items) == 0 {
-            <div style={{"color": "#94a3b8"}}>{t("war.nobody_yet", LANG)}</div>
+            <div style={{"color": "#9C978C"}}>{t("war.nobody_yet", ops_lang())}</div>
         }}
         {for (i, p) in enumerate(items) {
-            <div key={str(i)} style={{"padding": "6px 0", "borderTop": "1px solid #1e293b" if i > 0 else "none"}}>
-                <div style={{"fontSize": "13px", "color": "#38bdf8"}}>{(p["who"] as str) + " · " + t("lang." + (p["language"] as str), LANG)}</div>
+            <div key={str(i)} style={{"padding": "6px 0", "borderTop": "1px solid #2C2B27" if i > 0 else "none"}}>
+                <div style={{"fontSize": "13px", "color": "#7AA2FF"}}>{(p["who"] as str) + " · " + t("lang." + (p["language"] as str), ops_lang())}</div>
                 <div style={{"fontSize": "17px", "fontFamily": TEXT_FONT}}>{p["text"]}</div>
             </div>
         }}
@@ -53,31 +53,31 @@ def:pub RequestCard(req: dict[str, any], pressure: dict[str, any], people: list[
     value = (pressure["value"] or 0) as int;
     c = pressure_color(value);
     status = req["status"] as str;
-    return <Card dark={True} accent="#38bdf8">
+    return <Card dark={True} accent="#7AA2FF">
         <div style={{"display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "gap": "8px"}}>
             <div>
-                <div style={{"fontSize": "13px", "color": "#94a3b8"}}>{(req["id"] as str) + " · " + t("action." + (req["action"] as str), LANG)}</div>
-                <div style={{"fontSize": "22px", "fontWeight": "800"}}>{req["citizen"]}</div>
+                <div style={{"fontSize": "13px", "color": "#9C978C"}}>{(req["id"] as str) + " · " + t("action." + (req["action"] as str), ops_lang())}</div>
+                <div style={{"fontFamily": DISPLAY, "fontSize": "24px", "fontWeight": "800"}}>{req["citizen"]}</div>
                 <div style={{"fontSize": "20px"}}>{money(req["amount"]) + " → " + (req["payee"] as str)}</div>
             </div>
             <div style={{"display": "flex", "flexDirection": "column", "alignItems": "flex-end", "gap": "6px"}}>
                 <div style={{"position": "relative"}} onMouseEnter={lambda (e: MouseEvent) { hover = True; }}
                     onMouseLeave={lambda (e: MouseEvent) { hover = False; }}>
-                    <span style={{"cursor": "help", "padding": "3px 12px", "borderRadius": "999px", "background": "#1e3a5f",
-                                  "border": "1px solid #38bdf8", "fontSize": "16px"}}>{t("lang." + (req["language"] as str), LANG)}</span>
+                    <span style={{"cursor": "help", "padding": "3px 12px", "borderRadius": "999px", "background": "#22211E",
+                                  "border": "1px solid #7AA2FF", "fontSize": "16px"}}>{t("lang." + (req["language"] as str), ops_lang())}</span>
                     {hover and <PeopleSaw items={people} />}
                 </div>
-                <Badge text={t("status." + status, LANG)} color={color_of(status)} />
+                <Badge text={t("status." + status, ops_lang())} color={color_of(status)} />
             </div>
         </div>
-        <div style={{"marginTop": "12px", "display": "flex", "justifyContent": "space-between", "fontSize": "14px", "color": "#94a3b8"}}>
-            <span>{t("war.pressure", LANG)}</span>
-            <strong style={{"fontSize": "22px", "color": c}}>{str(value)}</strong>
+        <div style={{"marginTop": "12px", "display": "flex", "justifyContent": "space-between", "fontSize": "14px", "color": "#9C978C"}}>
+            <span>{t("war.pressure", ops_lang())}</span>
+            <strong style={{"fontFamily": DISPLAY, "fontSize": "26px", "color": c, "fontVariantNumeric": "tabular-nums"}}>{str(value)}</strong>
         </div>
         <Bar value={value / 100} color={c} height={12} dark={True} />
         <div style={{"display": "flex", "flexWrap": "wrap", "gap": "6px", "marginTop": "8px"}}>
             {for (i, reason) in enumerate((pressure["reasons"] or []) as list[str]) {
-                <span key={str(i)} style={{"fontSize": "13px", "padding": "2px 8px", "borderRadius": "6px", "background": "#1e293b",
+                <span key={str(i)} style={{"fontSize": "13px", "padding": "2px 8px", "borderRadius": "6px", "background": "#2C2B27",
                                            "fontFamily": TEXT_FONT}}>{reason}</span>
             }}
         </div>
@@ -93,17 +93,17 @@ def:pub AgentCard(p: dict[str, any], fresh: bool = False) -> JsxElement {
         <Card dark={True} accent={c}>
             <div style={{"display": "flex", "justifyContent": "space-between", "alignItems": "center", "gap": "8px"}}>
                 <div>
-                    <strong style={{"fontSize": "18px"}}>{t("agent." + agent, LANG)}</strong>
-                    <span style={{"fontSize": "12px", "color": "#64748b", "marginLeft": "8px"}}>{t("layer." + (LAYER_OF[agent] or "2"), LANG)}</span>
+                    <strong style={{"fontSize": "17px"}}>{t("agent." + agent, ops_lang())}</strong>
+                    <span style={{"fontFamily": MONO, "fontSize": "11px", "color": INK["muted"], "marginLeft": "8px", "textTransform": "uppercase", "letterSpacing": "0.06em"}}>{t("layer." + (LAYER_OF[agent] or "2"), ops_lang())}</span>
                 </div>
-                <Badge text={t("decision." + stance, LANG)} color={c} />
+                <Badge text={t("decision." + stance, ops_lang())} color={c} />
             </div>
             <div style={{"display": "flex", "alignItems": "center", "gap": "8px", "margin": "8px 0"}}>
                 <div style={{"flex": "1"}}><Bar value={p["confidence"] as float} color={c} dark={True} /></div>
-                <span style={{"fontSize": "13px", "color": "#94a3b8", "minWidth": "36px"}}>{str(round((p["confidence"] as float) * 100)) + "%"}</span>
+                <span style={{"fontSize": "13px", "color": "#9C978C", "minWidth": "36px"}}>{str(round((p["confidence"] as float) * 100)) + "%"}</span>
             </div>
-            <div style={{"fontSize": "15px", "color": "#cbd5e1", "fontFamily": TEXT_FONT}}>{p["reason"]}</div>
-            <div style={{"fontSize": "12px", "color": "#64748b", "marginTop": "6px"}}>{source_label(p["source"] as str, p["ms"] as int)}</div>
+            <div style={{"fontSize": "15px", "color": "#CFCBC1", "fontFamily": TEXT_FONT}}>{p["reason"]}</div>
+            <div style={{"fontFamily": MONO, "fontSize": "12px", "color": INK["muted"], "marginTop": "8px"}}>{source_label(p["source"] as str, p["ms"] as int)}</div>
         </Card>
     </div>;
 }
@@ -112,17 +112,22 @@ def:pub AgentCard(p: dict[str, any], fresh: bool = False) -> JsxElement {
 def:pub RulingCard(r: dict[str, any]) -> JsxElement {
     decision = r["decision"] as str;
     c = color_of(decision);
-    detail = t("war.rule", LANG) + " " + (r["rule"] as str) + " · " + t("war.assurance", LANG) + " " + (r["assurance"] as str)
+    detail = t("war.rule", ops_lang()) + " " + (r["rule"] as str) + " · " + t("war.assurance", ops_lang()) + " " + (r["assurance"] as str)
              + " · " + str(r["ms"]) + " ms";
     return <div style={{"animation": "rkIn 0.5s ease-out"}}>
-        <Card dark={True} accent={c} title={t("agent.ARBITER", LANG)}>
+        <Card dark={True} accent={c} title={t("agent.ARBITER", ops_lang())}>
             <div style={{"display": "flex", "gap": "10px", "alignItems": "center", "flexWrap": "wrap"}}>
-                <span style={{"fontSize": "40px", "fontWeight": "800", "color": c, "letterSpacing": "0.02em"}}>{t("decision." + decision, LANG)}</span>
-                {r["locked"] and <Badge text={"🔒 " + t("war.locked", LANG)} color="#ef4444" solid={True} />}
-                {r["deadlock"] and <Badge text={t("war.deadlock", LANG)} color="#a78bfa" solid={True} />}
+                <span style={{"fontFamily": DISPLAY, "fontSize": "44px", "fontWeight": "800", "color": c, "letterSpacing": "-0.01em",
+                              "lineHeight": "1", "animation": "rkStamp 0.4s ease-out both"}}>{t("decision." + decision, ops_lang())}</span>
+                {r["locked"] and <span style={{"display": "inline-flex", "alignItems": "center", "gap": "6px", "background": SIGNAL["danger"],
+                                               "color": "#16140F", "borderRadius": "4px", "padding": "3px 9px", "fontFamily": MONO,
+                                               "fontSize": "12px", "fontWeight": "700", "letterSpacing": "0.08em"}}>
+                    <Icon name="lock" size={14} stroke={2.6} />{t("war.locked", ops_lang())}
+                </span>}
+                {r["deadlock"] and <Badge text={t("war.deadlock", ops_lang())} color="#B19CFF" solid={True} />}
             </div>
             <div style={{"fontSize": "16px", "margin": "6px 0", "fontFamily": TEXT_FONT}}>{r["why"]}</div>
-            <div style={{"fontSize": "13px", "color": "#94a3b8"}}>{detail}</div>
+            <div style={{"fontFamily": MONO, "fontSize": "12.5px", "color": INK["muted"]}}>{detail}</div>
         </Card>
     </div>;
 }
@@ -153,19 +158,19 @@ def advocate_of(proposals: list[dict[str, any]]) -> dict[str, any] {
 def:pub DeadlockCard(proposals: list[dict[str, any]]) -> JsxElement {
     stop = strongest(proposals, True);
     go = advocate_of(proposals) or strongest(proposals, False);
-    return <Card dark={True} accent="#a78bfa" title={t("war.deadlock_title", LANG)}>
+    return <Card dark={True} accent="#B19CFF" title={t("war.deadlock_title", ops_lang())}>
         <div style={{"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "10px"}}>
-            {for (side, p, c) in [("war.side_stop", stop, "#f59e0b"), ("war.side_go", go, "#22c55e")] {
+            {for (side, p, c) in [("war.side_stop", stop, "#F2B544"), ("war.side_go", go, "#5BD48A")] {
                 <div key={side} style={{"border": "1px solid " + c, "borderRadius": "10px", "padding": "10px"}}>
-                    <div style={{"fontSize": "12px", "color": c, "textTransform": "uppercase"}}>{t(side, LANG)}</div>
+                    <div style={{"fontSize": "12px", "color": c, "textTransform": "uppercase"}}>{t(side, ops_lang())}</div>
                     {if p {
-                        <strong style={{"fontSize": "16px"}}>{t("agent." + (p["agent"] as str), LANG)}</strong>
-                        <div style={{"fontSize": "14px", "color": "#cbd5e1", "fontFamily": TEXT_FONT}}>{p["reason"]}</div>
+                        <strong style={{"fontSize": "16px"}}>{t("agent." + (p["agent"] as str), ops_lang())}</strong>
+                        <div style={{"fontSize": "14px", "color": "#CFCBC1", "fontFamily": TEXT_FONT}}>{p["reason"]}</div>
                     }}
                 </div>
             }}
         </div>
-        <p style={{"margin": "10px 0 0", "fontSize": "15px", "color": "#c4b5fd"}}>{t("war.no_lockout", LANG)}</p>
+        <p style={{"margin": "10px 0 0", "fontSize": "15px", "color": "#B19CFF"}}>{t("war.no_lockout", ops_lang())}</p>
     </Card>;
 }
 
@@ -180,13 +185,11 @@ def:pub CouncilColumn(room: dict[str, any], shown: int) -> JsxElement {
             <RequestCard req={room["request"] as dict[str, any]} pressure={room["pressure"] as dict[str, any]}
                 people={rows(room["people_saw"])} />
         } else {
-            <Card dark={True}><span style={{"fontSize": "18px", "color": "#94a3b8"}}>{t("war.no_request", LANG)}</span></Card>
+            <Card dark={True}><span style={{"fontSize": "18px", "color": "#9C978C"}}>{t("war.no_request", ops_lang())}</span></Card>
         }}
         {show_ruling and <RulingCard r={ruling as dict[str, any]} />}
         {show_ruling and (ruling as dict[str, any])["deadlock"] and <DeadlockCard proposals={proposals} />}
-        <div style={{"fontSize": "13px", "color": "#94a3b8", "textTransform": "uppercase", "letterSpacing": "0.05em", "marginTop": "4px"}}>
-            {t("war.council", LANG) + " · " + str(len(visible)) + "/" + str(len(proposals))}
-        </div>
+        <div style={{"marginTop": "6px"}}><Label text={t("war.council", ops_lang()) + " · " + str(len(visible)) + "/" + str(len(proposals))} dark={True} /></div>
         {for (i, p) in enumerate(visible) {
             <AgentCard key={p["agent"]} p={p} fresh={i == shown - 1} />
         }}

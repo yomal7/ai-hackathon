@@ -34,9 +34,10 @@ def checks_of(req: Request) -> list[ScamCheck] {
     return [n for n in [req ->:Checked:->] if isinstance(n, ScamCheck)];
 }
 
+"""The elder's language as a plain "si" / "ta" / "en" (never the Lang enum: screens get JSON)."""
 def _lang_of(req: Request) -> str {
     c = citizen_of(req);
-    return safe_lang(c.language if c else req.language);
+    return str(safe_lang(str(c.language if c else req.language)));
 }
 
 """Plain English situation for the LLM (never shown to the elder)."""
@@ -162,7 +163,7 @@ def scam_breaker_state(request_id: str) -> dict {
         "questions": [c.question for c in checks],
         "warning": _warnings.get(req.id, fixed_text("sb_warning", lang)) if checks else "",
         "answers": [c.answer for c in checks],
-        "readings": [c.jev_reading for c in checks],
+        "readings": [str(c.jev_reading) for c in checks],
         "guardian_message": fixed_text("sb_guardian_asked", lang, {"guardian": g.name if g else ""}) if asked else "",
         "spoken_en": [c.question for c in checks] if lang == "en" else spoken_english(req, len(checks)),
         "warning_en": (_warnings_en.get(req.id) or fixed_text("sb_warning", "en")) if checks else ""
@@ -182,7 +183,7 @@ def people_saw(request_id: str) -> list[dict] {
     g = guardian_of(c);
     for a in [req ->:Raised:->] {
         if isinstance(a, Alert) and a.kind == "GUARDIAN" {
-            out.append({"who": g.name if g else "Guardian", "language": a.language, "text": " / ".join([a.title] + list(a.lines))});
+            out.append({"who": g.name if g else "Guardian", "language": str(a.language), "text": " / ".join([a.title] + list(a.lines))});
         }
     }
     return out;

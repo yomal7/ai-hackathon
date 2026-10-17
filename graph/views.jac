@@ -15,7 +15,7 @@ import from agents.council.arbiter { ruling_of, ruling_dict }
 import from agents.council.scam_breaker { scam_breaker_state, people_saw }
 import from agents.network.network { network_state }
 import from ai.llm_calls { debrief }
-import from seed.money { BANK_COLUMN_X }
+import from seed.money { BANK_COLUMN_X, account_positions }
 import from operator { attrgetter }
 
 # Sort keys as named functions (Jac 0.34 cannot run block lambdas inside a def).
@@ -153,9 +153,11 @@ def graph_data(req: Request | None) -> dict[str, any] {
             edges.append({"from": c.id, "to": a.id, "type": "Owns", "label": "", "state": "normal"});
         }
     }
+    pos = account_positions(all_banks());     # used when an account's saved x / y is missing (0, 0)
     for a in all_accounts() {
         label = a.owner_name if a.kind != AccountKind.PERSONAL else a.id;
-        nodes.append({"id": a.id, "type": "Account", "label": label, "x": a.x, "y": a.y,
+        xy = [a.x, a.y] if (a.x or a.y) else pos.get(a.id, [0, 0]);
+        nodes.append({"id": a.id, "type": "Account", "label": label, "x": xy[0], "y": xy[1],
                       "state": account_state(a, req, blocked_payees, safe_people)});
         seen: list[str] = [];
         for b in [a ->:Paid:->] {

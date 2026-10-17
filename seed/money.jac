@@ -97,25 +97,33 @@ def layout_canvas(banks: dict[str, Bank]) {
         c.x = 50 + (i % 2) * 100;
         c.y = 40 + (i // 2) * 45;
     }
-    # Banks as 3 columns. The mule chain sits on one row so the money trail reads left to right.
+    pos = account_positions(list(banks.values()));
+    for b in banks.values() {
+        for a in [b <-:AccountAt:<-] {
+            if a.id in pos {
+                a.x = pos[a.id][0];
+                a.y = pos[a.id][1];
+            }
+        }
+    }
+}
+
+"""x / y of every account: banks as 3 columns, the mule chain on one row so the money trail reads left to right.
+A pure function of the graph, so the War Room view can also use it (positions set on accounts during a reset
+were not always saved by the server - see graph/views.jac)."""
+def account_positions(banks: list[Bank]) -> dict[str, list[int]] {
+    out: dict[str, list[int]] = {};
     rows = [y for y in range(40, 580, 42) if abs(y - CHAIN_Y) > 30];
-    for (short, b) in banks.items() {
-        col = BANK_COLUMN_X[short];
+    for b in banks {
+        col = BANK_COLUMN_X[b.short];
         others = sorted([a for a in [b <-:AccountAt:<-] if a.id not in MULE_CHAIN], key=attrgetter("id"));
         for (j, a) in enumerate(others) {
-            a.x = col - 45 + (j % 2) * 90;
-            a.y = rows[(j // 2) % len(rows)];
+            out[a.id] = [col - 45 + (j % 2) * 90, rows[(j // 2) % len(rows)]];
         }
     }
     xs = [BANK_COLUMN_X["LDB"], BANK_COLUMN_X["CDB"], BANK_COLUMN_X["IDB"], 940];
     for (k, aid) in enumerate(MULE_CHAIN) {
-        for b in banks.values() {
-            for a in [b <-:AccountAt:<-] {
-                if a.id == aid {
-                    a.x = xs[k];
-                    a.y = CHAIN_Y;
-                }
-            }
-        }
+        out[aid] = [xs[k], CHAIN_Y];
     }
+    return out;
 }
