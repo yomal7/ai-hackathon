@@ -1,12 +1,12 @@
 # Trust Graph SVG (C). x/y come from A's seed. Nodes coloured by state, money edges thicker by amount,
 # the Mule Ring / Money Tracer walk lit hop by hop with a moving dot (hop = how far the War Room has animated).
-import from .i18n { t, money }
+import from .i18n { t, money, ops_lang }
 import from .ui { Card, color_of, rows }
 
 glob STATES: list[str] = ["normal", "active", "suspect", "mule", "blocked", "frozen", "safe"];
 # Higher wins when several payments between the same two accounts are drawn as one line.
 glob SEVERITY: dict[str, int] = {"normal": 0, "safe": 1, "active": 2, "suspect": 3, "mule": 4, "blocked": 5, "frozen": 6};
-glob WALK_COLOR: dict[str, str] = {"MULE_RING": "#fde047", "MONEY_TRACE": "#f472b6"};
+glob WALK_COLOR: dict[str, str] = {"MULE_RING": "#FFE14A", "MONEY_TRACE": "#FF8FC7"};
 
 """Rs amount at the start of an edge label like 'Rs 650,000 · 14:02' (0 if none)."""
 def label_amount(label: str) -> int {
@@ -64,8 +64,8 @@ def:pub BankBand(n: dict[str, any], bottom: float) -> JsxElement {
     x = n["x"] as float;
     y = n["y"] as float;
     return <g>
-        <rect x={x - 88} y={y - 12} width="176" height={bottom - y + 24} rx="14" fill="#0f1a30" stroke="#1e293b" />
-        <text x={x} y={y + 6} fill="#94a3b8" fontSize="15" fontWeight="700" textAnchor="middle">{n["label"]}</text>
+        <rect x={x - 88} y={y - 12} width="176" height={bottom - y + 24} rx="14" fill="#141412" stroke="#2C2B27" />
+        <text x={x} y={y + 6} fill="#9C978C" fontSize="15" fontWeight="700" textAnchor="middle">{n["label"]}</text>
     </g>;
 }
 
@@ -89,9 +89,9 @@ def:pub GraphEdge(e: dict[str, any], a: dict[str, any], b: dict[str, any]) -> Js
         </g>;
     }
     return <g>
-        <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color_of(state) if hot else "#64748b"}
+        <line x1={ax} y1={ay} x2={bx} y2={by} stroke={color_of(state) if hot else "#77736A"}
             strokeOpacity={0.85 if hot else (0.10 if kind == "Owns" else 0.16)} strokeWidth={edge_width(amount)} />
-        {hot and amount > 0 and <text x={(ax + bx) / 2} y={(ay + by) / 2 - 5} fill="#fbbf24" fontSize="13" textAnchor="middle">
+        {hot and amount > 0 and <text x={(ax + bx) / 2} y={(ay + by) / 2 - 5} fill="#F2B544" fontSize="13" textAnchor="middle">
             {money(amount)}
         </text>}
     </g>;
@@ -105,22 +105,22 @@ def:pub GraphNode(n: dict[str, any], lit: bool, show_label: bool, ring: str) -> 
     big = state != "normal" or lit;
     r = (10 if n["type"] == "Citizen" else 8) if big else 5;
     return <g>
-        <title>{(n["label"] as str) + " (" + (n["id"] as str) + ") - " + t("state." + state, "en")}</title>
+        <title>{(n["label"] as str) + " (" + (n["id"] as str) + ") - " + t("state." + state, ops_lang())}</title>
         {lit and <circle cx={x} cy={y} r={r + 7} fill="none" stroke={ring} strokeWidth="3" style={{"animation": "rkPulse 1.4s ease-in-out infinite"}} />}
-        <circle cx={x} cy={y} r={r} fill={color_of(state)} stroke="#0b1120" strokeWidth="1.5" style={{"transition": "fill 0.6s ease"}} />
-        {state == "frozen" and <text x={x} y={y + 4} fill="#0b1120" fontSize="10" fontWeight="800" textAnchor="middle">{"❄"}</text>}
-        {show_label and <text x={x} y={y + r + 13} fill="#e2e8f0" fontSize={14 if big else 11} textAnchor="middle"
+        <circle cx={x} cy={y} r={r} fill={color_of(state)} stroke="#0F0F0D" strokeWidth="1.5" style={{"transition": "fill 0.6s ease"}} />
+        {state == "frozen" and <circle cx={x} cy={y} r={r + 4} fill="none" stroke={color_of(state)} strokeWidth="1.5" strokeDasharray="2 3" />}
+        {show_label and <text x={x} y={y + r + 13} fill="#EDEAE2" fontSize={14 if big else 11} textAnchor="middle"
             fontWeight={"700" if big else "400"}>{n["label"]}</text>}
     </g>;
 }
 
 """Colour legend under the graph."""
 def:pub Legend() -> JsxElement {
-    return <div style={{"display": "flex", "flexWrap": "wrap", "gap": "12px", "fontSize": "13px", "color": "#94a3b8", "marginTop": "6px"}}>
+    return <div style={{"display": "flex", "flexWrap": "wrap", "gap": "12px", "fontSize": "13px", "color": "#9C978C", "marginTop": "6px"}}>
         {for s in STATES {
             <span key={s} style={{"display": "inline-flex", "alignItems": "center", "gap": "5px"}}>
                 <span style={{"width": "10px", "height": "10px", "borderRadius": "50%", "background": color_of(s), "display": "inline-block"}} />
-                {t("state." + s, "en")}
+                {t("state." + s, ops_lang())}
             </span>
         }}
     </div>;
@@ -140,7 +140,7 @@ def:pub GraphView(graph: dict[str, any], walk: dict[str, any], hop: int) -> JsxE
     bottom = box[3] + 20;
 
     kind = (walk["kind"] or "MULE_RING") as str;
-    ring = WALK_COLOR[kind] or "#fde047";
+    ring = WALK_COLOR[kind] or "#FFE14A";
     path = (walk["path"] or []) as list[str];
     reached = min(hop, len(path) - 1);
     lit = path[:reached + 1];
@@ -150,9 +150,9 @@ def:pub GraphView(graph: dict[str, any], walk: dict[str, any], hop: int) -> JsxE
     hot = [e for e in edges if e["state"] != "normal" or e["type"] == "PaysTo"];
     dot = pos[path[reached]] if len(path) > 0 and reached >= 0 else None;
 
-    return <Card dark={True} title={t("screen.graph", "en")}>
+    return <Card dark={True} title={t("screen.graph", ops_lang())}>
         {len(path) > 0 and <div style={{"fontSize": "15px", "color": ring, "marginBottom": "4px"}}>
-            {t("walk." + kind, "en") + " · " + t("war.hop", "en") + " " + str(reached) + "/" + str(len(path) - 1)}
+            {t("walk." + kind, ops_lang()) + " · " + t("war.hop", ops_lang()) + " " + str(reached) + "/" + str(len(path) - 1)}
         </div>}
         <svg viewBox={str(left) + " " + str(top) + " " + str(width) + " " + str(height)} style={{"width": "100%", "height": "auto", "display": "block"}}>
             {for b in nodes {
@@ -173,7 +173,7 @@ def:pub GraphView(graph: dict[str, any], walk: dict[str, any], hop: int) -> JsxE
                     <GraphNode key={n["id"]} n={n} lit={(n["id"] as str) in lit} show_label={labelled(n, lit)} ring={ring} />
                 }
             }}
-            {dot and <circle r="9" fill={ring} stroke="#0b1120" strokeWidth="2"
+            {dot and <circle r="9" fill={ring} stroke="#0F0F0D" strokeWidth="2"
                 style={{"transform": "translate(" + str(dot["x"]) + "px, " + str(dot["y"]) + "px)", "transition": "transform 0.6s ease-in-out",
                         "filter": "drop-shadow(0 0 8px " + ring + ")"}} />}
         </svg>

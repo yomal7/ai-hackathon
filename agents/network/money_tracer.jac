@@ -21,6 +21,38 @@ obj Flow {
     has amount: float;
     has time: str;
     has minute: int | None;
+    has parts: list[float] = [];   # the single payments, when several went to the same account
+}
+
+"""Several payments to the same account are ONE hop: the money sits in one place.
+Amount = their total, time = the first one, parts = each payment (to know whose money stayed)."""
+def group_flows(flows: list[Flow]) -> list[Flow] {
+    out: list[Flow] = [];
+    for f in flows {
+        same = [g for g in out if g.acc.id == f.acc.id];
+        if same {
+            same[0].amount = same[0].amount + f.amount;
+            same[0].parts.append(f.amount);
+        } else {
+            out.append(Flow(acc=f.acc, amount=f.amount, time=f.time, minute=f.minute, parts=[f.amount]));
+        }
+    }
+    return out;
+}
+
+"""Payments in `parts` that were NOT passed on: no later outflow of about the same amount (3 %)."""
+def stayed_parts(parts: list[float], outs: list[float]) -> list[float] {
+    left = list(outs);
+    kept: list[float] = [];
+    for p in parts {
+        same = [o for o in left if abs(o - p) <= 0.03 * p];
+        if same {
+            left.remove(same[0]);
+        } else {
+            kept.append(p);
+        }
+    }
+    return kept;
 }
 
 def _flow(acc: Account, e: Paid) -> Flow {
@@ -82,7 +114,7 @@ walker MoneyTracer {
             self._start(here);
         }
         if self.depth.get(here.id, 0) >= MAX_HOPS { skip; }
-        nexts = [f for f in paid_out(here) if f.acc.id not in self.path and _after(f, self.arrived.get(here.id))];
+        nexts = group_flows([f for f in paid_out(here) if f.acc.id not in self.path and _after(f, self.arrived.get(here.id))]);
         if not nexts { skip; }
         facts = [account_facts(f.acc, f.amount, f.minute) for f in nexts];
         scores = jev_mule_scores(facts);       # ONE Jev call for this hop
@@ -115,7 +147,16 @@ walker MoneyTracer {
         self.path.append(acc.id);
         self.depth[acc.id] = self.depth.get(src.id, 0) + 1;
         if mv.minute is not None { self.arrived[acc.id] = mv.minute; }
-        victim = self.victim_of.get(src.id + ":" + fmt_rs(amount), self.victim_of.get(src.id, ""));
+        # Whose money is this? Each payment's victim, then keep the ones whose money did not move on.
+        parts = mv.parts or [amount];
+        names: dict[str, str] = {};
+        for p in parts {
+            names[fmt_rs(p)] = self.victim_of.get(src.id + ":" + fmt_rs(p), self.victim_of.get(src.id, ""));
+            self.victim_of[acc.id + ":" + fmt_rs(p)] = names[fmt_rs(p)];
+        }
+        outs = [o.amount for o in paid_out(acc) if _after(o, mv.minute)];
+        kept = stayed_parts(parts, outs) or [max(parts)];
+        victim = ", ".join(sorted(set([names[fmt_rs(p)] for p in kept if names[fmt_rs(p)]])));
         self.victim_of[acc.id] = victim;
         moved = f["minutes_to_move_on"];
         traced = traced_score(acc.opened_days_ago, int(moved) if moved is not None else None, acc.kind);

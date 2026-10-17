@@ -1,7 +1,7 @@
 # UI text for si / ta / en (C). All user-facing text goes through t(key, lang).
 # Sinhala / Tamil strings: to be checked by a native speaker.
 # si / ta cover every screen the elder and the family see (phone, Scam-Breaker, guardian, story).
-# The War Room and the control panel are English by design; their keys fall back to English.
+# War Room / control panel: main labels in si / ta; agent reasons stay English (judges read them).
 # Keep one entry per line: tests/i18n_tests.jac reads this file as text.
 
 glob LANGS: list[str] = ["si", "ta", "en"];
@@ -299,7 +299,61 @@ glob SI: dict[str, str] = {
     "guardian.new_alert": "නව දැනුම්දීමක්",
     "story.debrief": "සිදු වූ දේ",
     "story.timeline": "සෑම නියෝජිත ක්‍රියාවක්ම",
-    "story.counters": "අවසාන සංඛ්‍යා"
+    "story.counters": "අවසාන සංඛ්‍යා",
+    "screen.war_room": "මෙහෙයුම් කාමරය",
+    "screen.telemetry": "ආදර්ශන පාලක පුවරුව",
+    "screen.graph": "විශ්වාස ජාලය",
+    "screen.analyst": "වංචා විශ්ලේෂක",
+    "nav.phone": "දුරකථනය",
+    "nav.war_room": "මෙහෙයුම් කාමරය",
+    "nav.guardian": "භාරකරු",
+    "nav.story": "කතාව",
+    "war.checked": "පරීක්ෂා කළ ඉල්ලීම්",
+    "war.blocked": "නැවැත්වූ",
+    "war.held": "රඳවා ගත්",
+    "war.protected": "ආරක්ෂා කළ",
+    "war.recovered": "ආපසු ලබාගත්",
+    "war.human": "මිනිස් තීරණ",
+    "war.detect_times": "එක් එක් වින්දිතයා හඳුනාගත් කාලය",
+    "war.missed": "මඟ හැරුණා",
+    "war.council": "බැංකු මණ්ඩලය",
+    "war.no_request": "ඉල්ලීමක් එනතුරු…",
+    "war.normal_vs": "සාමාන්‍ය ආරක්ෂාව සහ රක්ෂක",
+    "war.normal_security": "සාමාන්‍ය ආරක්ෂාව",
+    "war.password": "මුරපදය",
+    "war.device": "දන්නා උපාංගය",
+    "war.place": "දන්නා ස්ථානය",
+    "war.signals": "බැංකු අතර සංඥා",
+    "war.no_signals": "තවම බැංකු අතර සංඥා නැහැ.",
+    "war.timeline": "කාලරේඛාව",
+    "war.people_saw": "මිනිසුන් දුටු දේ",
+    "war.pressure": "පීඩන මානය",
+    "war.locked": "අගුළු දමා ඇත",
+    "war.no_lockout": "අපි වැඩිහිටියන්ගේම මුදල් වලින් ඔවුන්ව අගුළු දමා නොතබා ආරක්ෂා කරනවා.",
+    "tele.note": "අනුකරණය කළ උපාංග සංඥා — සැබෑ බැංකු යෙදුමක SDK එක මේවා ලබා දෙයි.",
+    "tele.live": "සජීවී දුරකථනය",
+    "tele.signals": "උපාංග සංඥා",
+    "tele.on_call": "දුරකථන ඇමතුමක",
+    "tele.remote_app": "දුරස්ථ පාලන යෙදුම විවෘතයි",
+    "tele.pasted": "ගිණුම් අංකය ඇලෙව්වා",
+    "tele.typing_change": "ටයිප් කරන විදිය වෙනස් වුණා",
+    "tele.hesitation": "පැකිළීම (ms)",
+    "tele.backtracks": "ආපසු යාම්",
+    "tele.scenarios": "ආදර්ශන අවස්ථා",
+    "tele.reset": "ආදර්ශනය යළි අරඹන්න",
+    "tele.voices": "මෙම උපාංගයේ හඬ",
+    "tele.test_voice": "අහන්න",
+    "tele.screen_now": "දුරකථන තිරය",
+    "tele.pressure_now": "පීඩනය",
+    "tele.qr_title": "සැබෑ දුරකථනයක විවෘත කරන්න",
+    "scenario.S1": "S1 සාමාන්‍ය දවසක්",
+    "scenario.S2": "S2 සොරකම් කළ මුරපදය",
+    "scenario.S3": "S3 වංචා ඇමතුම",
+    "scenario.S4": "S4 ජාල ප්‍රතිශක්තිය",
+    "scenario.S5": "S5 පාන්දර 1ට රෝහල",
+    "analyst.approve": "අත්හිටුවීම අනුමත කරන්න",
+    "analyst.keep_open": "විවෘතව තබන්න",
+    "analyst.none": "විශ්ලේෂකයෙකු අවශ්‍ය සිදුවීම් නැහැ."
 };
 
 # Tamil - to be checked by a native speaker. Missing keys (War Room, control panel) use English.
@@ -376,10 +430,73 @@ glob TA: dict[str, str] = {
     "guardian.new_alert": "புதிய எச்சரிக்கை",
     "story.debrief": "என்ன நடந்தது",
     "story.timeline": "ஒவ்வொரு முகவர் செயலும்",
-    "story.counters": "இறுதி எண்கள்"
+    "story.counters": "இறுதி எண்கள்",
+    "screen.war_room": "கட்டுப்பாட்டு அறை",
+    "screen.telemetry": "டெமோ கட்டுப்பாட்டுப் பலகை",
+    "screen.graph": "நம்பிக்கை வலைப்பின்னல்",
+    "screen.analyst": "மோசடி ஆய்வாளர்",
+    "nav.phone": "தொலைபேசி",
+    "nav.war_room": "கட்டுப்பாட்டு அறை",
+    "nav.guardian": "பாதுகாவலர்",
+    "nav.story": "கதை",
+    "war.checked": "சரிபார்த்த கோரிக்கைகள்",
+    "war.blocked": "தடுக்கப்பட்டவை",
+    "war.held": "நிறுத்தி வைக்கப்பட்டவை",
+    "war.protected": "பாதுகாக்கப்பட்டது",
+    "war.recovered": "மீட்கப்பட்டது",
+    "war.human": "மனித முடிவுகள்",
+    "war.detect_times": "ஒவ்வொரு பாதிக்கப்பட்டவரும் கண்டறியப்பட்ட நேரம்",
+    "war.missed": "தவறவிட்டது",
+    "war.council": "வங்கிக் குழு",
+    "war.no_request": "கோரிக்கைக்காகக் காத்திருக்கிறது…",
+    "war.normal_vs": "சாதாரண பாதுகாப்பு மற்றும் ரக்ஷகா",
+    "war.normal_security": "சாதாரண பாதுகாப்பு",
+    "war.password": "கடவுச்சொல்",
+    "war.device": "தெரிந்த சாதனம்",
+    "war.place": "தெரிந்த இடம்",
+    "war.signals": "வங்கிகளுக்கு இடையிலான சமிக்ஞைகள்",
+    "war.no_signals": "இன்னும் வங்கிகளுக்கு இடையே சமிக்ஞைகள் இல்லை.",
+    "war.timeline": "காலவரிசை",
+    "war.people_saw": "மக்கள் பார்த்தவை",
+    "war.pressure": "அழுத்த அளவி",
+    "war.locked": "பூட்டப்பட்டது",
+    "war.no_lockout": "முதியவர்களை அவர்களின் சொந்தப் பணத்திலிருந்து பூட்டாமல் நாங்கள் பாதுகாக்கிறோம்.",
+    "tele.note": "உருவகப்படுத்தப்பட்ட சாதன சமிக்ஞைகள் — உண்மையான வங்கி செயலியின் SDK இவற்றைத் தரும்.",
+    "tele.live": "நேரடி தொலைபேசி",
+    "tele.signals": "சாதன சமிக்ஞைகள்",
+    "tele.on_call": "தொலைபேசி அழைப்பில்",
+    "tele.remote_app": "தொலைநிலை அணுகல் செயலி திறந்துள்ளது",
+    "tele.pasted": "கணக்கு எண் ஒட்டப்பட்டது",
+    "tele.typing_change": "தட்டச்சு முறை மாறியது",
+    "tele.hesitation": "தயக்கம் (ms)",
+    "tele.backtracks": "பின்வாங்கல்கள்",
+    "tele.scenarios": "டெமோ காட்சிகள்",
+    "tele.reset": "டெமோவை மீட்டமை",
+    "tele.voices": "இந்தச் சாதனத்தின் குரல்கள்",
+    "tele.test_voice": "கேள்",
+    "tele.screen_now": "தொலைபேசித் திரை",
+    "tele.pressure_now": "அழுத்தம்",
+    "tele.qr_title": "உண்மையான தொலைபேசியில் திறக்கவும்",
+    "scenario.S1": "S1 சாதாரண நாள்",
+    "scenario.S2": "S2 திருடப்பட்ட கடவுச்சொல்",
+    "scenario.S3": "S3 மோசடி அழைப்பு",
+    "scenario.S4": "S4 வலைப்பின்னல் நோயெதிர்ப்பு",
+    "scenario.S5": "S5 அதிகாலை 1 மணிக்கு மருத்துவமனை",
+    "analyst.approve": "முடக்கத்தை அனுமதி",
+    "analyst.keep_open": "திறந்தே வை",
+    "analyst.none": "ஆய்வாளர் தேவைப்படும் நிகழ்வுகள் இல்லை."
 };
 
 glob _warned: dict[str, bool] = {};
+
+# Language of the operator screens (War Room, control panel). The screen sets it while rendering, so every
+# panel inside reads the same value. Keys without si / ta text fall back to English.
+glob:pub OPS: dict[str, str] = {"lang": "en"};
+
+"""Current operator screen language."""
+def:pub ops_lang() -> str {
+    return OPS["lang"] or "en";
+}
 
 """Text for a UI key. Missing in that language -> English + one console warning."""
 def:pub t(key: str, lang: str) -> str {
@@ -442,21 +559,30 @@ def:pub day_month(date_text: str) -> str {
     return str(int(parts[2])) + " " + MONTHS[int(parts[1]) - 1];
 }
 
-"""Language switch: සිං | தமிழ் | EN."""
+"""Language switch: සිං | தமிழ் | EN. Paper: chunky segmented block. Ink: thin pill."""
 def:pub LanguageSwitch(lang: str, onChange: Callable[[str], None], dark: bool = False) -> JsxElement {
-    return <div style={{"display": "inline-flex", "gap": "4px", "fontSize": "15px"}}>
-        {for code in LANGS {
+    rim = "#3A3934" if dark else "#16140F";
+    return <div role="group" aria-label="Language" style={{
+        "display": "inline-flex", "overflow": "hidden", "borderRadius": "999px" if dark else "10px",
+        "border": ("1px solid " if dark else "2px solid ") + rim, "background": "transparent" if dark else "#FFFCF5",
+        "boxShadow": "none" if dark else "3px 3px 0 #16140F"
+    }}>
+        {for (i, code) in enumerate(LANGS) {
             <button
                 key={code}
+                type="button"
+                aria-pressed={code == lang}
                 onClick={lambda (e: MouseEvent) { onChange(code); }}
                 style={{
-                    "padding": "4px 10px",
-                    "borderRadius": "999px",
+                    "padding": "5px 12px" if dark else "7px 13px",
+                    "minHeight": "34px" if dark else "40px",
                     "cursor": "pointer",
-                    "border": "1px solid " + ("#475569" if dark else "#cbd5e1"),
-                    "background": ("#38bdf8" if dark else "#0f766e") if code == lang else "transparent",
-                    "color": ("#0f172a" if dark else "#ffffff") if code == lang else ("#e2e8f0" if dark else "#334155"),
-                    "fontWeight": "700" if code == lang else "400"
+                    "border": "none",
+                    "borderLeft": ("1px solid " + rim if dark else "2px solid " + rim) if i > 0 else "none",
+                    "background": ("#EDEAE2" if dark else "#16140F") if code == lang else "transparent",
+                    "color": ("#16140F" if dark else "#FFFCF5") if code == lang else ("#9C978C" if dark else "#16140F"),
+                    "fontSize": "14px" if dark else "16px",
+                    "fontWeight": "700"
                 }}
             >{t("lang." + code, "en")}</button>
         }}

@@ -3,12 +3,18 @@
 # No voice for si / ta on this device -> speak the English version and show the text extra large.
 import from react { useEffect }
 import from .i18n { t, tf }
-import from .ui { Card }
+import from .ui { Card, Button, Icon, Label }
+import from .theme { PAPER, FILL, DISPLAY }
 import from .voice { useVoices, pick_voice, speak }
 
 sv import from ..walkers.api { scam_answer }
 
-glob ANSWER_KEYS: list[str] = ["breaker.yes", "breaker.no", "breaker.unsure"];
+# Answer buttons: i18n key + button kind (colour is never the only signal: the word is always there).
+glob ANSWERS: list[dict[str, str]] = [
+    {"key": "breaker.yes", "kind": "danger", "icon": "check"},
+    {"key": "breaker.no", "kind": "safe", "icon": "x"},
+    {"key": "breaker.unsure", "kind": "warn", "icon": "alert"}
+];
 
 """Index of the first unanswered question (-1 = all answered)."""
 def first_open(answers: list[str]) -> int {
@@ -36,8 +42,9 @@ def:pub ScamBreakerCard(sb: dict[str, any], request_id: str, lang: str, onAnswer
     family = (sb["guardian_message"] or t("breaker.family_asked", lang)) as str;
 
     # Speak question i (or the warning when i < 0): own language if possible, else the English version.
+    # No English version known -> stay silent; never read si / ta text with an English voice.
     def say(i: int) {
-        # No English version known -> stay silent; never read si / ta text with an English voice.
+        text = "";                    # declared here: a name first set inside if / else is not visible after it in JS
         if i >= 0 {
             text = questions[i] if native else (spoken_en[i] or "");
         } else {
@@ -67,50 +74,60 @@ def:pub ScamBreakerCard(sb: dict[str, any], request_id: str, lang: str, onAnswer
         onAnswered();
     }
 
-    big = "34px" if not native else "28px";      # extra large text when the voice is English
-    button = {"padding": "18px", "fontSize": "24px", "fontWeight": "700", "borderRadius": "16px", "border": "none",
-              "cursor": "pointer", "width": "100%"};
-    return <div style={{"display": "flex", "flexDirection": "column", "gap": "14px"}}>
-        <Card accent="#f59e0b">
-            <h2 style={{"margin": "0 0 6px", "fontSize": "26px"}}>{t("breaker.title", lang)}</h2>
-            {warning and <p style={{"fontSize": "20px", "margin": "0", "lineHeight": "1.45"}}>{warning}</p>}
-        </Card>
+    big = "34px" if not native else "29px";      # extra large text when the voice is English
+    return <div style={{"display": "flex", "flexDirection": "column", "gap": "16px"}}>
+        <div style={{"background": FILL["warn"], "border": "2px solid #16140F", "borderRadius": "12px", "boxShadow": "4px 4px 0 #16140F",
+                     "padding": "16px 18px"}}>
+            <div style={{"display": "flex", "alignItems": "center", "gap": "10px", "marginBottom": "6px"}}>
+                <Icon name="shield" size={26} stroke={2.6} />
+                <h2 style={{"margin": "0", "fontFamily": DISPLAY, "fontSize": "26px", "fontWeight": "800", "lineHeight": "1.2"}}>{t("breaker.title", lang)}</h2>
+            </div>
+            {warning and <p style={{"fontSize": "20px", "margin": "0", "lineHeight": "1.55"}}>{warning}</p>}
+        </div>
         {if current >= 0 {
             <Card>
-                <p style={{"margin": "0 0 8px", "color": "#64748b", "fontSize": "16px"}}>
-                    {tf("breaker.question_n", lang, {"n": current + 1, "total": len(questions)})}
-                </p>
-                <p style={{"fontSize": big, "fontWeight": "700", "margin": "0 0 12px", "lineHeight": "1.35"}}>{questions[current]}</p>
-                {not native and <p style={{"fontSize": "14px", "color": "#92400e", "margin": "0 0 10px"}}>{t("breaker.voice_note", lang)}</p>}
-                <button style={{**button, "background": "#e2e8f0", "color": "#0f172a", "fontSize": "18px", "padding": "10px"}}
-                    onClick={lambda (e: MouseEvent) { say(current); }}>{"🔊 " + t("breaker.repeat", lang)}</button>
+                <div style={{"display": "flex", "justifyContent": "space-between", "alignItems": "center", "gap": "8px"}}>
+                    <Label text={tf("breaker.question_n", lang, {"n": current + 1, "total": len(questions)})} />
+                    <div style={{"display": "flex", "gap": "4px", "marginBottom": "8px"}}>
+                        {for (i, q) in enumerate(questions) {
+                            <span key={str(i)} style={{"width": "22px", "height": "8px", "borderRadius": "3px", "border": "2px solid #16140F",
+                                                       "background": "#16140F" if i <= current else PAPER["card"]}} />
+                        }}
+                    </div>
+                </div>
+                <p style={{"fontFamily": DISPLAY, "fontSize": big, "fontWeight": "800", "margin": "0 0 14px", "lineHeight": "1.4"}}>{questions[current]}</p>
+                {not native and <p style={{"fontSize": "15px", "margin": "0 0 12px", "display": "inline-block", "background": FILL["mark"],
+                                          "border": "2px solid #16140F", "borderRadius": "6px", "padding": "2px 8px"}}>{t("breaker.voice_note", lang)}</p>}
+                <Button label={t("breaker.repeat", lang)} icon="speaker" onClick={lambda { say(current); }} />
             </Card>
-            <div style={{"display": "flex", "flexDirection": "column", "gap": "10px"}}>
-                {for (i, key) in enumerate(ANSWER_KEYS) {
-                    <button key={key} disabled={sending}
-                        style={{**button, "color": "#ffffff", "opacity": 0.6 if sending else 1,
-                                "background": ["#0f766e", "#334155", "#a16207"][i]}}
-                        onClick={lambda (e: MouseEvent) { answer(t(key, lang)); }}>{t(key, lang)}</button>
+            <div style={{"display": "flex", "flexDirection": "column", "gap": "12px"}}>
+                {for a in ANSWERS {
+                    <Button key={a["key"]} label={t(a["key"], lang)} kind={a["kind"]} icon={a["icon"]} size="lg" full={True}
+                        busy={sending} onClick={lambda { answer(t(a["key"], lang)); }} />
                 }}
             </div>
-            <label style={{"display": "flex", "flexDirection": "column", "gap": "6px", "fontSize": "17px", "color": "#334155"}}>
+            <label style={{"display": "flex", "flexDirection": "column", "gap": "8px", "fontSize": "18px", "fontWeight": "700"}}>
                 {t("breaker.type_answer", lang)}
                 <div style={{"display": "flex", "gap": "8px"}}>
                     <input value={typed} disabled={sending}
-                        style={{"padding": "14px", "fontSize": "20px", "borderRadius": "12px", "border": "2px solid #cbd5e1",
-                                "flex": "1", "minWidth": "0"}}
+                        style={{"padding": "14px", "fontSize": "20px", "borderRadius": "10px", "border": "2px solid #16140F",
+                                "background": PAPER["card"], "flex": "1", "minWidth": "0"}}
                         onChange={lambda (e: ChangeEvent) { typed = e.target.value; }} />
-                    <button disabled={sending or not typed.strip()}
-                        style={{**button, "width": "auto", "fontSize": "18px", "background": "#0f766e", "color": "#ffffff"}}
-                        onClick={lambda (e: MouseEvent) { answer(typed); }}>{t("breaker.send", lang)}</button>
+                    <Button label={t("breaker.send", lang)} kind="primary" icon="send" disabled={not typed.strip()} busy={sending}
+                        onClick={lambda { answer(typed); }} />
                 </div>
             </label>
         } else {
-            <Card accent="#0f766e">
-                <p style={{"fontSize": big, "fontWeight": "700", "margin": "0 0 10px", "lineHeight": "1.35"}}>{family}</p>
-                <p style={{"fontSize": "20px", "margin": "0 0 12px"}}>{t("breaker.stay", lang)}</p>
-                <button style={{**button, "background": "#e2e8f0", "color": "#0f172a", "fontSize": "18px", "padding": "10px"}}
-                    onClick={lambda (e: MouseEvent) { say(-1); }}>{"🔊 " + t("breaker.repeat", lang)}</button>
+            <Card accent={FILL["safe"]}>
+                <div style={{"display": "flex", "gap": "12px", "alignItems": "flex-start"}}>
+                    <span style={{"width": "48px", "height": "48px", "borderRadius": "50%", "background": "#16140F", "display": "inline-flex",
+                                  "alignItems": "center", "justifyContent": "center", "flexShrink": "0"}}>
+                        <Icon name="user" size={26} color={FILL["safe"]} stroke={2.6} />
+                    </span>
+                    <p style={{"fontFamily": DISPLAY, "fontSize": big, "fontWeight": "800", "margin": "0", "lineHeight": "1.4"}}>{family}</p>
+                </div>
+                <p style={{"fontSize": "20px", "lineHeight": "1.55", "margin": "14px 0"}}>{t("breaker.stay", lang)}</p>
+                <Button label={t("breaker.repeat", lang)} icon="speaker" onClick={lambda { say(-1); }} />
             </Card>
         }}
     </div>;

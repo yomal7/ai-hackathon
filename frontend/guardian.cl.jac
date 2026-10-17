@@ -3,16 +3,17 @@
 import from react { useEffect }
 import from "@jac/runtime" { useLocation }
 import from .i18n { t, tf }
-import from .ui { Header, Card, Badge, theme, rows, last_report, query_param }
+import from .ui { Header, Card, Badge, Button, Icon, Spinner, theme, rows, last_report, query_param, poll_begin, poll_end }
+import from .theme { PAPER, FILL, DISPLAY }
 import from .phone { PhoneFrame }
 
 sv import from ..walkers.api { get_guardian, guardian_answer, set_language }
 
 # Buttons: answer -> i18n key + colour.
 glob BUTTONS: list[dict[str, str]] = [
-    {"answer": "REJECT", "key": "guardian.reject", "color": "#dc2626"},
-    {"answer": "APPROVE", "key": "guardian.approve", "color": "#16a34a"},
-    {"answer": "CALL", "key": "guardian.call", "color": "#2563eb"}
+    {"answer": "REJECT", "key": "guardian.reject", "kind": "danger", "icon": "x"},
+    {"answer": "APPROVE", "key": "guardian.approve", "kind": "safe", "icon": "check"},
+    {"answer": "CALL", "key": "guardian.call", "kind": "plain", "icon": "phone"}
 ];
 
 """Short two-tone beep (Web Audio, no sound file) + vibration. Browsers may block sound until the first tap."""
@@ -70,30 +71,32 @@ def:pub GuardianAlert(alert: dict[str, any], lang: str, fresh: bool = False, onA
         }
     }
 
-    return <Card accent={"#dc2626" if is_open else "#94a3b8"}>
-        <div style={{"display": "flex", "justifyContent": "space-between", "alignItems": "center", "gap": "8px", "marginBottom": "6px"}}>
-            <span style={{"fontSize": "15px", "color": "#64748b"}}>{alert["elder"] and tf("guardian.for", lang, {"name": alert["elder"]})}</span>
-            {fresh and is_open and <Badge text={t("guardian.new_alert", lang)} color="#dc2626" solid={True} />}
+    return <Card accent={FILL["danger"] if is_open else PAPER["soft"]}>
+        <div style={{"display": "flex", "justifyContent": "space-between", "alignItems": "center", "gap": "8px", "marginBottom": "8px"}}>
+            <span style={{"fontSize": "16px", "fontWeight": "700", "color": PAPER["muted"]}}>{alert["elder"] and tf("guardian.for", lang, {"name": alert["elder"]})}</span>
+            {fresh and is_open and <Badge text={t("guardian.new_alert", lang)} color={FILL["mark"]} solid={True} dark={False} />}
         </div>
-        <h2 style={{"margin": "0 0 10px", "fontSize": "24px", "lineHeight": "1.3"}}>{alert["title"]}</h2>
+        <h2 style={{"margin": "0 0 10px", "fontFamily": DISPLAY, "fontSize": "27px", "fontWeight": "800", "lineHeight": "1.3"}}>{alert["title"]}</h2>
         {for (i, line) in enumerate(alert["lines"] as list[str]) {
-            <p key={str(i)} style={{"fontSize": "19px", "margin": "6px 0", "lineHeight": "1.4"}}>{line}</p>
+            <p key={str(i)} style={{"fontSize": "20px", "margin": "8px 0", "lineHeight": "1.5", "paddingLeft": "12px",
+                                    "borderLeft": "4px solid " + PAPER["line"]}}>{line}</p>
         }}
         {if not is_open {
-            <Badge text={tf("guardian.your_answer", lang, {"answer": answer_text(alert["answer"] as str, lang)})} color="#16a34a" />
+            <div style={{"display": "inline-flex", "alignItems": "center", "gap": "8px", "marginTop": "10px", "background": FILL["safe"],
+                         "border": "2px solid #16140F", "borderRadius": "8px", "padding": "6px 12px", "fontSize": "18px", "fontWeight": "700"}}>
+                <Icon name="check" size={20} stroke={2.6} />
+                {tf("guardian.your_answer", lang, {"answer": answer_text(alert["answer"] as str, lang)})}
+            </div>
         } else {
-            <div style={{"display": "flex", "flexDirection": "column", "gap": "10px", "marginTop": "12px"}}>
+            <div style={{"display": "flex", "flexDirection": "column", "gap": "12px", "marginTop": "16px"}}>
                 {for b in BUTTONS {
-                    <button
-                        key={b["answer"]}
-                        disabled={sending or b["answer"] not in options}
-                        onClick={lambda (e: MouseEvent) { answer(b["answer"]); }}
-                        style={{"padding": "16px", "fontSize": "20px", "fontWeight": "700", "borderRadius": "14px", "border": "none",
-                                "color": "#ffffff", "background": b["color"], "opacity": 1 if b["answer"] in options and not sending else 0.35,
-                                "cursor": "pointer" if b["answer"] in options else "not-allowed"}}
-                    >{t(b["key"], lang)}</button>
+                    <Button key={b["answer"]} label={t(b["key"], lang)} kind={b["kind"]} icon={b["icon"]} size="lg" full={True}
+                        disabled={b["answer"] not in options} busy={sending} onClick={lambda { answer(b["answer"]); }} />
                 }}
-                {"APPROVE" not in options and <p style={{"fontSize": "15px", "color": "#64748b", "margin": "0"}}>{t("guardian.locked", lang)}</p>}
+                {"APPROVE" not in options and <p style={{"display": "flex", "gap": "8px", "alignItems": "flex-start", "fontSize": "16px",
+                                                         "lineHeight": "1.45", "margin": "0", "color": PAPER["muted"]}}>
+                    <Icon name="lock" size={20} />{t("guardian.locked", lang)}
+                </p>}
             </div>
         }}
     </Card>;
@@ -110,7 +113,16 @@ def:pub GuardianScreen() -> JsxElement {
     guardian_id = query_param(useLocation().search as str, "id") or "g_dilshan";
 
     async def load() {
-        got = last_report(root spawn get_guardian(guardian_id=guardian_id));
+        if not poll_begin("guardian") {
+            return;
+        }
+        got: dict[str, any] = {};
+        try {
+            got = last_report(root spawn get_guardian(guardian_id=guardian_id));
+        } except Exception {
+            console.warn("[guardian] load failed");
+        }
+        poll_end("guardian");
         if not got {
             return;
         }
@@ -153,10 +165,17 @@ def:pub GuardianScreen() -> JsxElement {
     alerts = rows(data["alerts"]);
     return <PhoneFrame>
         <Header title={t("screen.guardian", lang)} lang={lang} onLang={change_lang} />
-        <div style={{"padding": "16px", "display": "flex", "flexDirection": "column", "gap": "14px", "background": theme(False)["bg"]}}>
-            {data["name"] and <p style={{"margin": "0", "color": "#64748b"}}>{data["name"]}</p>}
+        <div lang={lang} style={{"padding": "18px 16px 28px", "display": "flex", "flexDirection": "column", "gap": "16px"}}>
+            {data["name"] and <p style={{"margin": "0", "display": "flex", "alignItems": "center", "gap": "8px", "fontSize": "18px", "fontWeight": "700"}}>
+                <Icon name="user" size={20} />{data["name"]}
+            </p>}
             {if len(alerts) == 0 {
-                <Card><p style={{"fontSize": "20px", "margin": "0"}}>{t("guardian.no_alerts", lang)}</p></Card>
+                <Card accent={FILL["safe"]}>
+                    <div style={{"display": "flex", "alignItems": "center", "gap": "12px"}}>
+                        <Icon name="shield" size={30} stroke={2.4} />
+                        <p style={{"fontSize": "22px", "fontWeight": "700", "margin": "0"}}>{t("guardian.no_alerts", lang)}</p>
+                    </div>
+                </Card>
             }}
             {for a in alerts {
                 <GuardianAlert key={a["id"]} alert={a} lang={lang} fresh={a["id"] in fresh_ids} onAnswered={load} />

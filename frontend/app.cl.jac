@@ -1,6 +1,7 @@
 # Top-level client app (C): routes for every screen. main.jac renders <App/>.
 import from "@jac/runtime" { Router, Routes, Route, Navigate }
-import from .ui { load_fonts, no_read_cache, read_cache_off, FONT_STACK }
+import from .ui { load_fonts, no_read_cache, read_cache_off }
+import from .theme { FONT_STACK }
 import from .phone { Phone }
 import from .telemetry { Telemetry }
 import from .war_room { WarRoom }

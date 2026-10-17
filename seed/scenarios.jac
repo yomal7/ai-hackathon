@@ -1,5 +1,6 @@
 # Demo scenarios S1-S5, demo seed and reset (A)
 # Walker names are FIXED (section 7): RunScenario(name), ResetDemo.
+import threading;
 import from graph.nodes { Bank, Device, Request, RequestStatus }
 import from graph.queries { demo_state, clear_demo, all_banks, find_citizen, create_request, add_timeline }
 import from seed.banks { seed_banks }
@@ -65,10 +66,23 @@ def seed_demo() {
     add_timeline("SYSTEM", "Demo reset - simulation, fictional data");
 }
 
-"""Seed only if the graph is empty (first start of the server)."""
+# Screens poll every second, so the first calls arrive together. Without the lock each of them saw
+# "no banks" and seeded the whole demo again (4 copies of every bank and person).
+glob _SEED_LOCK: threading.Lock = threading.Lock();
+glob _SEED: dict[str, bool] = {"done": False};
+
+"""Seed only if the graph is empty (first start of the server). One request at a time."""
 def ensure_seeded() {
-    if not all_banks() {
-        seed_demo();
+    if _SEED["done"] {
+        return;
+    }
+    with _SEED_LOCK {
+        if not _SEED["done"] {
+            if not all_banks() {
+                seed_demo();
+            }
+            _SEED["done"] = True;
+        }
     }
 }
 
@@ -137,7 +151,10 @@ walker RunScenario {
 """Delete everything and re-seed the demo graph. Counters go back to zero."""
 walker ResetDemo {
     can reset with Root entry {
-        seed_demo();
+        with _SEED_LOCK {
+            seed_demo();
+            _SEED["done"] = True;
+        }
         report {"ok": True};
     }
 }

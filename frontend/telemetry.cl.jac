@@ -1,14 +1,14 @@
-# Demo control panel (C): English. Simulated device signals, scenarios S1-S5, reset, voices, QR codes for real phones.
+# Demo control panel (C). Ink skin. Simulated device signals, scenarios S1-S5, reset, voices, QR codes for real phones.
 import from react { useEffect }
 import from "@jac/runtime" { Link }
 import from "qrcode.react" { QRCodeSVG }
-import from .i18n { t, tf }
-import from .ui { Header, Card, Bar, Badge, theme, pressure_color, last_report, rows, pause }
+import from .i18n { t, tf, ops_lang, OPS }
+import from .ui { Header, Card, Bar, Badge, Button, Icon, Label, theme, pressure_color, last_report, rows, pause, poll_begin, poll_end }
+import from .theme { INK, SIGNAL, DISPLAY, MONO }
 import from .voice { useVoices, pick_voice, speak }
 
 sv import from ..walkers.api { run_scenario, reset_demo, telemetry_update, get_phone, submit_request }
 
-glob LANG: str = "en";
 glob SCENARIOS: list[str] = ["S1", "S2", "S3", "S4", "S5"];
 glob LIVE: list[str] = ["S3", "S4"];    # replayed step by step so the pressure meter climbs on screen
 glob STEP_MS: int = 1200;
@@ -32,6 +32,8 @@ glob QR_LINKS: list[dict[str, str]] = [
 ];
 glob ELDERS: list[dict[str, str]] = [{"id": "c_seeya", "name": "Seeya"}, {"id": "c_kamala", "name": "Kamala"}];
 glob BASE_KEY: str = "rk_base_url";
+glob CLEAR: dict[str, any] = {"on_call": False, "remote_app": False, "pasted_account": False, "typing_change": False,
+                              "hesitation_ms": 0, "backtracks": 0};
 
 """Saved base address for QR codes (this page's address if none)."""
 def saved_base() -> str {
@@ -42,60 +44,92 @@ def saved_base() -> str {
     }
 }
 
-"""One on/off signal switch."""
+"""One on/off signal switch (a real switch, with ON / OFF in words)."""
 def:pub Toggle(label: str, on: bool, onFlip: Callable[[], None]) -> JsxElement {
-    return <button onClick={lambda (e: MouseEvent) { onFlip(); }} style={{
+    return <button className="rk-btn" type="button" role="switch" aria-checked={on} onClick={lambda (e: MouseEvent) { onFlip(); }} style={{
         "display": "flex", "justifyContent": "space-between", "alignItems": "center", "gap": "12px", "width": "100%",
-        "padding": "12px 14px", "borderRadius": "12px", "fontSize": "16px", "cursor": "pointer", "color": "#e2e8f0",
-        "border": "1px solid " + ("#f59e0b" if on else "#334155"), "background": "#3b2a0a" if on else "#1e293b"
+        "padding": "11px 14px", "borderRadius": "6px", "fontSize": "16px", "cursor": "pointer", "color": INK["text"],
+        "border": "1px solid " + (SIGNAL["warn"] if on else INK["soft"]), "background": "#2E2614" if on else "#1D1C19"
     }}>
-        <span>{label}</span>
-        <Badge text={"ON" if on else "OFF"} color={"#f59e0b" if on else "#64748b"} solid={on} />
+        <span style={{"textAlign": "left"}}>{label}</span>
+        <span style={{"display": "inline-flex", "alignItems": "center", "gap": "8px", "fontFamily": MONO, "fontSize": "12px",
+                      "fontWeight": "700", "color": SIGNAL["warn"] if on else INK["muted"]}}>
+            {"ON" if on else "OFF"}
+            <span style={{"width": "34px", "height": "18px", "borderRadius": "999px", "position": "relative", "display": "inline-block",
+                          "background": SIGNAL["warn"] if on else "#3A3934", "transition": "background 0.2s"}}>
+                <span style={{"position": "absolute", "top": "2px", "left": "18px" if on else "2px", "width": "14px", "height": "14px",
+                              "borderRadius": "50%", "background": "#16140F" if on else INK["muted"], "transition": "left 0.2s"}} />
+            </span>
+        </span>
     </button>;
 }
 
 """One slider signal (hesitation ms, backtracks)."""
 def:pub Slider(label: str, value: int, top: int, step: int, onMove: Callable[[int], None]) -> JsxElement {
-    return <label style={{"display": "flex", "flexDirection": "column", "gap": "4px", "fontSize": "15px"}}>
-        <span style={{"display": "flex", "justifyContent": "space-between"}}><span>{label}</span><strong>{str(value)}</strong></span>
-        <input type="range" min="0" max={str(top)} step={str(step)} value={str(value)}
+    return <label style={{"display": "flex", "flexDirection": "column", "gap": "6px", "fontSize": "15px"}}>
+        <span style={{"display": "flex", "justifyContent": "space-between"}}>
+            <span>{label}</span>
+            <strong style={{"fontFamily": MONO}}>{str(value)}</strong>
+        </span>
+        <input type="range" min="0" max={str(top)} step={str(step)} value={str(value)} style={{"accentColor": INK["accent"]}}
             onChange={lambda (e: ChangeEvent) { onMove(int(e.target.value)); }} />
     </label>;
 }
 
-"""Voices for one language: how many, which one we will use, and a test button."""
+"""Voices for one language: how many, which one we will use, and a test button.
+No voice for si / ta -> the test speaks the English sample (what the phone would do) and says so."""
 def:pub VoiceRow(code: str, voices: list[dict[str, str]]) -> JsxElement {
     mine = [v for v in voices if v["lang"].lower().startswith(code)];
     chosen = pick_voice(voices, code);
-    return <div style={{"display": "flex", "alignItems": "center", "gap": "12px", "padding": "8px 0", "borderBottom": "1px solid #1e293b"}}>
-        <strong style={{"minWidth": "70px"}}>{t("tele.lang_name." + code, LANG)}</strong>
-        <span style={{"minWidth": "80px", "color": "#94a3b8"}}>{tf("tele.voice_count", LANG, {"n": len(mine)})}</span>
-        <span style={{"flex": "1", "color": "#22c55e" if chosen else "#f59e0b"}}>
-            {t("tele.voice_used", LANG) + ": " + (chosen["name"] + " (" + chosen["lang"] + ")" if chosen else t("tele.no_voice", LANG))}
+
+    def test() {
+        if chosen {
+            speak(t("tele.voice_sample", code), code, voices);
+        } else {
+            speak(t("tele.voice_sample", "en"), "en", voices);
+        }
+    }
+
+    return <div style={{"display": "grid", "gridTemplateColumns": "86px 1fr auto", "alignItems": "center", "gap": "12px",
+                        "padding": "10px 0", "borderTop": "1px solid " + INK["line"]}}>
+        <div style={{"display": "flex", "flexDirection": "column", "gap": "2px"}}>
+            <strong>{t("tele.lang_name." + code, ops_lang())}</strong>
+            <span style={{"fontFamily": MONO, "fontSize": "12px", "color": INK["muted"]}}>{tf("tele.voice_count", ops_lang(), {"n": len(mine)})}</span>
+        </div>
+        <span style={{"fontSize": "14px", "lineHeight": "1.4", "color": SIGNAL["safe"] if chosen else SIGNAL["warn"]}}>
+            {t("tele.voice_used", ops_lang()) + ": " + (chosen["name"] if chosen else t("tele.no_voice", ops_lang()))}
         </span>
-        <button onClick={lambda (e: MouseEvent) { speak(t("tele.voice_sample", code), code, voices); }}
-            style={{"padding": "6px 12px", "borderRadius": "8px", "border": "1px solid #334155", "background": "#1e293b", "color": "#e2e8f0", "cursor": "pointer"}}
-        >{t("tele.test_voice", LANG)}</button>
+        <Button label={t("tele.test_voice", ops_lang())} icon="speaker" size="sm" dark={True} onClick={test} />
     </div>;
 }
 
 def:pub Telemetry() -> JsxElement {
     has last: str = "",
-        signals: dict[str, any] = {"on_call": False, "remote_app": False, "pasted_account": False, "typing_change": False,
-                                   "hesitation_ms": 0, "backtracks": 0},
+        lang: str = "en",
+        running: str = "",           # scenario being run ("" = none) -> spinner + other buttons wait
+        signals: dict[str, any] = CLEAR,
         pressure: int = 0,
         screen: str = "",
         elder: str = "c_seeya",
         base: str = "";
 
+    OPS["lang"] = lang;
     voices = useVoices();
 
     async def load() {
-        phone = last_report(root spawn get_phone(request_id="latest:" + elder));
-        if phone {
-            pressure = phone["pressure"] as int;
-            screen = phone["screen"] as str;
+        if not poll_begin("telemetry") {
+            return;
         }
+        try {
+            phone = last_report(root spawn get_phone(request_id="latest:" + elder));
+            if phone {
+                pressure = phone["pressure"] as int;
+                screen = phone["screen"] as str;
+            }
+        } except Exception {
+            console.warn("[telemetry] load failed");
+        }
+        poll_end("telemetry");
     }
 
     useEffect(lambda {
@@ -115,10 +149,16 @@ def:pub Telemetry() -> JsxElement {
     }
 
     async def run(name: str) {
-        title = t("scenario." + name, LANG);
+        if running {
+            return;
+        }
+        running = name;
+        title = t("scenario." + name, lang);
+        last = title + " …";
         if name not in LIVE {
             started = last_report(root spawn run_scenario(name=name));
             last = title + " → " + (started["request_id"] as str);
+            running = "";
             return;
         }
         # Live: build the request, send the phone's signals one by one, then call the Bank Council.
@@ -126,7 +166,7 @@ def:pub Telemetry() -> JsxElement {
         rid = started["request_id"] as str;
         steps = rows(started["steps"]);
         for (i, step) in enumerate(steps) {
-            last = tf("tele.step", LANG, {"name": title, "n": i + 1, "total": len(steps)});
+            last = tf("tele.step", lang, {"name": title, "n": i + 1, "total": len(steps)});
             await pause(STEP_MS);
             sent = last_report(root spawn telemetry_update(request_id=rid, signals=step));
             pressure = sent["pressure"] as int;
@@ -134,12 +174,18 @@ def:pub Telemetry() -> JsxElement {
         await pause(STEP_MS);
         root spawn submit_request(request_id=rid);
         last = title + " → " + rid;
+        running = "";
     }
 
     async def reset() {
+        if running {
+            return;
+        }
+        running = "reset";
         root spawn reset_demo();
-        signals = {"on_call": False, "remote_app": False, "pasted_account": False, "typing_change": False, "hesitation_ms": 0, "backtracks": 0};
-        last = t("tele.reset", LANG) + " ✓";
+        signals = CLEAR;
+        last = t("tele.reset", lang) + " ✓";
+        running = "";
         load();
     }
 
@@ -152,76 +198,94 @@ def:pub Telemetry() -> JsxElement {
         }
     }
 
-    th = theme(True);
-    button = {"padding": "12px 16px", "borderRadius": "10px", "border": "1px solid #334155", "background": "#1e293b",
-              "color": "#e2e8f0", "fontSize": "16px", "cursor": "pointer"};
-    grid = {"display": "grid", "gridTemplateColumns": "repeat(auto-fit, minmax(340px, 1fr))", "gap": "14px",
-            "padding": "16px 20px", "alignItems": "start"};
-    return <div style={{"background": th["bg"], "color": th["text"], "minHeight": "100vh"}}>
-        <Header title={t("screen.telemetry", LANG)} lang={LANG} onLang={lambda (code: str) { }} dark={True}>
-            <nav style={{"display": "flex", "gap": "12px"}}>
+    grid = {"display": "grid", "gridTemplateColumns": "repeat(auto-fit, minmax(340px, 1fr))", "gap": "16px",
+            "padding": "18px 24px 32px", "alignItems": "start"};
+    return <div className="rk-ink" style={{"background": INK["bg"], "color": INK["text"], "minHeight": "100vh"}}>
+        <Header title={t("screen.telemetry", lang)} lang={lang} onLang={lambda (code: str) { lang = code; }} dark={True}>
+            <nav style={{"display": "flex", "gap": "4px"}}>
                 {for s in SCREENS {
-                    <Link key={s["path"]} to={s["path"]} style={{"color": th["accent"]}}>{t(s["key"], LANG)}</Link>
+                    <Link key={s["path"]} to={s["path"]} style={{"color": INK["text"], "textDecoration": "none", "fontSize": "15px",
+                                                                "padding": "6px 10px", "borderRadius": "6px", "border": "1px solid " + INK["line"]}}>
+                        {t(s["key"], lang)}
+                    </Link>
                 }}
             </nav>
         </Header>
-        <p style={{"color": "#fbbf24", "margin": "12px 20px 0", "fontSize": "15px"}}>{t("tele.note", LANG)}</p>
+        <p style={{"display": "flex", "alignItems": "center", "gap": "8px", "color": SIGNAL["warn"], "margin": "14px 24px 0", "fontSize": "15px"}}>
+            <Icon name="alert" size={18} />{t("tele.note", lang)}
+        </p>
         <div style={grid}>
-            <Card dark={True} title={t("tele.live", LANG)}>
-                <div style={{"display": "flex", "gap": "8px", "marginBottom": "10px"}}>
-                    {for p in ELDERS {
-                        <button key={p["id"]} onClick={lambda (e: MouseEvent) { elder = p["id"]; }}
-                            style={{**button, "padding": "6px 12px", "borderColor": th["accent"] if elder == p["id"] else "#334155"}}
+            <Card dark={True} title={t("tele.live", lang)}>
+                <div role="group" style={{"display": "inline-flex", "border": "1px solid " + INK["soft"], "borderRadius": "6px", "overflow": "hidden",
+                                          "marginBottom": "14px"}}>
+                    {for (i, p) in enumerate(ELDERS) {
+                        <button key={p["id"]} type="button" aria-pressed={elder == p["id"]} onClick={lambda (e: MouseEvent) { elder = p["id"]; }}
+                            style={{"padding": "8px 16px", "fontSize": "15px", "fontWeight": "700", "cursor": "pointer", "border": "none",
+                                    "borderLeft": ("1px solid " + INK["soft"]) if i > 0 else "none",
+                                    "background": INK["accent"] if elder == p["id"] else "transparent",
+                                    "color": "#16140F" if elder == p["id"] else INK["text"]}}
                         >{p["name"]}</button>
                     }}
                 </div>
-                <div style={{"display": "flex", "justifyContent": "space-between", "fontSize": "15px"}}>
-                    <span>{t("tele.screen_now", LANG) + ": " + (screen or "-")}</span>
-                    <strong style={{"color": pressure_color(pressure)}}>{t("tele.pressure_now", LANG) + " " + str(pressure)}</strong>
+                <div style={{"display": "flex", "justifyContent": "space-between", "alignItems": "baseline", "marginBottom": "8px"}}>
+                    <span style={{"fontSize": "15px", "color": INK["muted"]}}>
+                        {t("tele.screen_now", lang) + ": "}<strong style={{"fontFamily": MONO, "color": INK["text"]}}>{screen or "-"}</strong>
+                    </span>
+                    <span style={{"fontFamily": DISPLAY, "fontSize": "30px", "fontWeight": "800", "color": pressure_color(pressure),
+                                  "fontVariantNumeric": "tabular-nums"}}>{str(pressure)}</span>
                 </div>
-                <div style={{"marginTop": "8px"}}><Bar value={pressure / 100} color={pressure_color(pressure)} height={14} dark={True} /></div>
+                <Bar value={pressure / 100} color={pressure_color(pressure)} height={10} dark={True} />
+                <div style={{"fontFamily": MONO, "fontSize": "11.5px", "color": INK["muted"], "marginTop": "6px", "textTransform": "uppercase",
+                             "letterSpacing": "0.08em"}}>{t("tele.pressure_now", lang)}</div>
             </Card>
-            <Card dark={True} title={t("tele.signals", LANG)}>
+            <Card dark={True} title={t("tele.signals", lang)}>
                 <div style={{"display": "flex", "flexDirection": "column", "gap": "8px"}}>
                     {for tg in TOGGLES {
-                        <Toggle key={tg["signal"]} label={t(tg["key"], LANG)} on={bool(signals[tg["signal"]])}
+                        <Toggle key={tg["signal"]} label={t(tg["key"], lang)} on={bool(signals[tg["signal"]])}
                             onFlip={lambda { send(tg["signal"], not signals[tg["signal"]]); }} />
                     }}
-                    <Slider label={t("tele.hesitation", LANG)} value={signals["hesitation_ms"] as int} top={15000} step={500}
-                        onMove={lambda (v: int) { send("hesitation_ms", v); }} />
-                    <Slider label={t("tele.backtracks", LANG)} value={signals["backtracks"] as int} top={10} step={1}
-                        onMove={lambda (v: int) { send("backtracks", v); }} />
+                    <div style={{"marginTop": "6px", "display": "flex", "flexDirection": "column", "gap": "12px"}}>
+                        <Slider label={t("tele.hesitation", lang)} value={signals["hesitation_ms"] as int} top={15000} step={500}
+                            onMove={lambda (v: int) { send("hesitation_ms", v); }} />
+                        <Slider label={t("tele.backtracks", lang)} value={signals["backtracks"] as int} top={10} step={1}
+                            onMove={lambda (v: int) { send("backtracks", v); }} />
+                    </div>
                 </div>
             </Card>
-            <Card dark={True} title={t("tele.scenarios", LANG)}>
-                <div style={{"display": "flex", "gap": "10px", "flexWrap": "wrap"}}>
+            <Card dark={True} title={t("tele.scenarios", lang)}>
+                <div style={{"display": "flex", "flexDirection": "column", "gap": "8px"}}>
                     {for s in SCENARIOS {
-                        <button key={s} style={button} onClick={lambda (e: MouseEvent) { run(s); }}>{t("scenario." + s, LANG)}</button>
+                        <Button key={s} label={t("scenario." + s, lang)} icon="play" dark={True} full={True}
+                            kind={"primary" if s == "S3" else "plain"} busy={running == s} disabled={bool(running) and running != s}
+                            onClick={lambda { run(s); }} />
                     }}
-                    <button style={{**button, "borderColor": "#ef4444", "color": "#fca5a5"}} onClick={lambda (e: MouseEvent) { reset(); }}>{t("tele.reset", LANG)}</button>
+                    <Button label={t("tele.reset", lang)} icon="reset" kind="danger" dark={True} full={True}
+                        busy={running == "reset"} disabled={bool(running) and running != "reset"} onClick={reset} />
                 </div>
-                {last and <p style={{"color": th["muted"], "marginBottom": "0"}}>{last}</p>}
+                {last and <p role="status" style={{"fontFamily": MONO, "fontSize": "13px", "color": INK["muted"], "margin": "12px 0 0"}}>{last}</p>}
             </Card>
-            <Card dark={True} title={t("tele.voices", LANG)}>
+            <Card dark={True} title={t("tele.voices", lang)}>
                 {for code in ["si", "ta", "en"] {
                     <VoiceRow key={code} code={code} voices={voices} />
                 }}
             </Card>
-            <Card dark={True} title={t("tele.qr_title", LANG)}>
-                <label style={{"display": "flex", "flexDirection": "column", "gap": "6px", "fontSize": "14px", "color": th["muted"]}}>
-                    {t("tele.base_url", LANG)}
+            <Card dark={True} title={t("tele.qr_title", lang)}>
+                <label style={{"display": "flex", "flexDirection": "column", "gap": "6px", "fontSize": "14px", "color": INK["muted"]}}>
+                    {t("tele.base_url", lang)}
                     <input value={base} onChange={lambda (e: ChangeEvent) { save_base(e.target.value); }}
-                        style={{"padding": "8px", "borderRadius": "8px", "border": "1px solid #334155", "background": "#0b1120", "color": "#e2e8f0", "fontSize": "15px"}} />
+                        style={{"padding": "9px 10px", "borderRadius": "6px", "border": "1px solid " + INK["soft"], "background": INK["sunk"],
+                                "color": INK["text"], "fontSize": "15px", "fontFamily": MONO}} />
                 </label>
-                <p style={{"color": th["muted"], "fontSize": "13px"}}>{t("tele.qr_hint", LANG)}</p>
-                <div style={{"display": "grid", "gridTemplateColumns": "repeat(2, 1fr)", "gap": "14px"}}>
+                <p style={{"color": INK["muted"], "fontSize": "13px"}}>{t("tele.qr_hint", lang)}</p>
+                <div style={{"display": "grid", "gridTemplateColumns": "repeat(2, 1fr)", "gap": "16px"}}>
                     {for q in QR_LINKS {
                         <div key={q["path"]} style={{"display": "flex", "flexDirection": "column", "alignItems": "center", "gap": "6px"}}>
-                            <div style={{"background": "#ffffff", "padding": "8px", "borderRadius": "8px"}}>
-                                <QRCodeSVG value={base + q["path"]} size={120} />
+                            <div style={{"background": "#FFFCF5", "padding": "8px", "borderRadius": "4px"}}>
+                                <QRCodeSVG value={base + q["path"]} size={120} bgColor="#FFFCF5" fgColor="#16140F" />
                             </div>
-                            <strong style={{"fontSize": "14px"}}>{t(q["key"], LANG)}</strong>
-                            <a href={base + q["path"]} target="_blank" style={{"color": th["accent"], "fontSize": "11px", "wordBreak": "break-all"}}>{base + q["path"]}</a>
+                            <strong style={{"fontSize": "14px"}}>{t(q["key"], lang)}</strong>
+                            <a href={base + q["path"]} target="_blank" style={{"color": SIGNAL["info"], "fontFamily": MONO, "fontSize": "11px",
+                                                                               "wordBreak": "break-all", "textAlign": "center"}}>{base + q["path"]}</a>
                         </div>
                     }}
                 </div>
