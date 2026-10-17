@@ -3,7 +3,7 @@
 import time;
 import from graph.nodes { RNode, Citizen, Habit, Account, Request, Proposal, PressureReading, Stance, Action }
 import from graph.edges { Has, HasProposal, Read }
-import from graph.queries { citizen_of, payee_of, add_timeline }
+import from graph.queries { citizen_of, payee_of, add_timeline, now_s }
 
 # Stances that mean "risk". ALLOW / WATCH carry no risk.
 glob RISKY_STANCES: list[str] = ["STEP_UP", "HOLD", "BLOCK", "ASK_GUARDIAN", "FREEZE"];
@@ -92,7 +92,7 @@ def proposals_of(target: RNode) -> list[Proposal] {
 }
 
 def proposal_of(target: RNode, agent: str) -> Proposal | None {
-    found = [p for p in proposals_of(target) if p.agent == agent];
+    found = sorted([p for p in proposals_of(target) if p.agent == agent], key=lambda p: Proposal: p.at);
     return found[-1] if found else None;
 }
 
@@ -102,6 +102,9 @@ def put_proposal(target: RNode, p: Proposal) -> Proposal {
         if old.agent == p.agent {
             del old;
         }
+    }
+    if p.at == 0.0 {
+        p.at = now_s();
     }
     target +>:HasProposal:+> p;
     add_timeline(str(p.agent), f"{p.stance} ({p.confidence:.2f}) - {p.reason}");
@@ -121,7 +124,7 @@ def proposal_dict(p: Proposal) -> dict[str, any] {
 
 """Latest pressure reading of a request, or None."""
 def latest_pressure(req: Request) -> PressureReading | None {
-    found = [req ->:Read:->];
+    found = sorted([req ->:Read:->], key=lambda r: PressureReading: r.at);
     return found[-1] if found else None;
 }
 

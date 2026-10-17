@@ -259,3 +259,27 @@ def create_request(
     }
     return req;
 }
+
+"""Change a person's language (citizen, guardian or analyst). Only "si" | "ta" | "en". False if not found."""
+def set_person_language(person_id: str, language: str) -> bool {
+    if language not in ["si", "ta", "en"] {
+        return False;
+    }
+    lang = Lang(language);
+    c = find_citizen(person_id);
+    if c is not None {
+        c.language = lang;
+        return True;
+    }
+    g = find_guardian(person_id);
+    if g is not None {
+        g.language = lang;
+        return True;
+    }
+    an = find_analyst();
+    if an is not None and an.id == person_id {
+        an.language = lang;
+        return True;
+    }
+    return False;
+}

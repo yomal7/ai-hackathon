@@ -7,6 +7,7 @@ import from seed.people { seed_places, seed_people }
 import from seed.money { seed_money, layout_canvas }
 import from agents.council.arbiter { RunCouncil }
 import from agents.phone.coercion_sentinel { CoercionSentinel }
+import from agents.network.net_common { reset_network }
 
 # Scam reference texts the scenarios type into the "reference" box.
 # si / ta: to be checked by a native speaker.
@@ -53,6 +54,7 @@ glob SCENARIOS: dict[str, dict[str, any]] = {
 """Wipe the graph and build the whole demo again. Running it twice gives the same graph."""
 def seed_demo() {
     clear_demo();
+    reset_network();     # B's Fraud Network memory
     banks = seed_banks();
     places = seed_places();
     accounts = seed_people(banks, places);

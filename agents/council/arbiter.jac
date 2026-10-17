@@ -32,7 +32,7 @@ glob STATUS_FOR: dict[str, RequestStatus] = {
 
 """Latest Ruling on a request, or None."""
 def ruling_of(req: Request) -> Ruling | None {
-    found = [req ->:Decided:->];
+    found = sorted([req ->:Decided:->], key=lambda r: Ruling: r.at);
     return found[-1] if found else None;
 }
 
@@ -47,7 +47,7 @@ def write_ruling(req: Request, decision: str, why: str, rule: str, ms: int = 0,
                  deadlock: bool = False, locked: bool = False) -> Ruling {
     assurance = "LOW" if decision == "ALLOW" else ("MEDIUM" if decision == "STEP_UP" else "HIGH");
     r = Ruling(decision=Decision(decision), why=why, rule=rule, ms=ms, deadlock=deadlock,
-               assurance=Assurance(assurance), locked=locked);
+               assurance=Assurance(assurance), locked=locked, at=now_s());
     req +>:Decided:+> r;
     req.status = STATUS_FOR[decision];
     add_timeline("ARBITER", f"{decision} ({rule}{', locked' if locked else ''}{', deadlock' if deadlock else ''}) - {why}");

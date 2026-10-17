@@ -121,6 +121,7 @@ node PressureReading(RNode) {
     has time: str;
     has value: int;                       # 0..100
     has top_reasons: list[str] = [];
+    has at: float = 0.0;                  # extra: wall-clock creation time - saved edges do not keep their order
 }
 
 node Proposal(RNode) {
@@ -131,6 +132,7 @@ node Proposal(RNode) {
     has reason: str;                      # short, English
     has ms: int = 0;
     has source: str = "code";             # "jev" | "llm" | "code" | "fallback"
+    has at: float = 0.0;                  # extra: wall-clock creation time - saved edges do not keep their order
 }
 
 node Ruling(RNode) {
@@ -141,6 +143,7 @@ node Ruling(RNode) {
     has deadlock: bool = False;
     has assurance: Assurance = Assurance.LOW;
     has locked: bool = False;
+    has at: float = 0.0;                  # extra: wall-clock creation time - saved edges do not keep their order
 }
 
 node ScamCheck(RNode) {

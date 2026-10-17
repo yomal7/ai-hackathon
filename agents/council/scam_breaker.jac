@@ -14,5 +14,11 @@ walker ScamAnswer {
 
 """Scam-Breaker part of the phone / War Room data."""
 def scam_breaker_state(request_id: str) -> dict {
-    return {"active": False, "language": "", "questions": [], "warning": "", "answers": []};
+    return {"active": False, "language": "", "questions": [], "warning": "", "answers": [],
+            "readings": [], "guardian_message": ""};
+}
+
+"""War Room hover: what the elder and the guardian saw, in their language. [{"who","language","text"}]"""
+def people_saw(request_id: str) -> list[dict] {
+    return [];
 }

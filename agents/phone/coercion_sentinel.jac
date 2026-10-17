@@ -91,7 +91,7 @@ walker CoercionSentinel {
         rv = jev_pressure(tel, request_state(here));
         value = int(score(rv.coached) * 100);
         reasons = top_reasons(here);
-        here +>:Read:+> PressureReading(time=now_hms(), value=value, top_reasons=reasons);
+        here +>:Read:+> PressureReading(time=now_hms(), value=value, top_reasons=reasons, at=now_s());
 
         stance: Stance = Stance.HOLD if value >= 70 else (Stance.STEP_UP if value >= 40 else Stance.ALLOW);
         conf = confidence_for(stance, rv.coached);
