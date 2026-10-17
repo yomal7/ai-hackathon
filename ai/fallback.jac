@@ -25,6 +25,11 @@ def _num(d: dict, key: str, fallback_val: float = 0.0) -> float {
     return to_float(d.get(key), fallback_val);
 }
 
+"""Round to 2 decimals (0..1 scores)."""
+def round2(x: float) -> float {
+    return int(x * 100 + 0.5) / 100;
+}
+
 def _clip(x: float, lo: float, hi: float) -> float {
     return int(max(lo, min(x, hi)) * 100 + 0.5) / 100;
 }

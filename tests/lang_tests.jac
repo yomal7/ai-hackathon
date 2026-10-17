@@ -6,7 +6,7 @@ import from ai.lang {
 }
 
 def placeholders(text: str) -> set[str] {
-    return set(re.findall("\\{(\\w+)\\}", text));
+    return set([str(m) for m in re.findall("\\{(\\w+)\\}", text)]);
 }
 
 test "every fixed text exists in si, ta and en" {

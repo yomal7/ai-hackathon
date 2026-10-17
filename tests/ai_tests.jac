@@ -1,9 +1,16 @@
 """Tests for ai/ stubs and fallbacks (owner: Person B). Run: jac test tests/ai_tests.jac"""
 
+import os;
+import time;
 import from ai.types { RiskVector }
-import from ai.jev { jev_request_vector, jev_pressure, jev_pattern, jev_read_reply, jev_mule_scores }
+import from ai.jev { jev_request_vector, jev_pressure, jev_pattern, jev_read_reply, jev_mule_scores, jev_call, jev_last }
 import from ai.llm_calls { scam_questions, guardian_card, analyst_card, debrief, arbiter_decide, learn_pattern }
 import from ai.lang { detect_language, scam_keywords_hit }
+
+# These tests check the code fallbacks, so they run with NO Jev key (no network).
+with entry {
+    os.environ["TYPESAFE_API_KEY"] = "";
+}
 
 glob SEEYA_HABITS: list[dict] = [
     {"action": "BILL_PAY", "typical_amount": 4500, "hour_from": 9, "hour_to": 18, "count": 40},
@@ -87,15 +94,15 @@ test "mule scores: new fast account high, old shop low" {
 
 test "LLM stubs return fixed texts in the asked language" {
     q = scam_questions("x", "si");
-    assert q["language"] == "si" and len(q["questions"]) == 3;
-    assert detect_language(q["questions"][0]) == "si";
-    assert detect_language(scam_questions("x", "ta")["warning"]) == "ta";
+    assert q["language"] == "si" and len(list(q["questions"])) == 3;
+    assert detect_language(str(q["questions"][0])) == "si";
+    assert detect_language(str(scam_questions("x", "ta")["warning"])) == "ta";
     c = guardian_card("x", [], "si", {"name": "Siriwardena", "parent": "father", "amount": 4200000, "others": 2});
-    assert len(c["lines"]) == 3 and "4,200,000" in c["title"];
+    assert len(list(c["lines"])) == 3 and "4,200,000" in c["title"];
     assert [o["value"] for o in c["options"]] == ["REJECT", "APPROVE", "CALL"];
-    assert len(guardian_card("x", [], "ta")["lines"]) <= 3;
+    assert len(list(guardian_card("x", [], "ta")["lines"])) <= 3;
     a = analyst_card("Freeze CDB-40213?", ["e1", "e2", "e3", "e4"]);
-    assert a["language"] == "en" and len(a["lines"]) == 3;
+    assert a["language"] == "en" and len(list(a["lines"])) == 3;
     assert len(debrief({"name": "Seeya", "amount": 4200000}, "ta").split("\n")) == 4;
 }
 
@@ -111,4 +118,32 @@ test "keywords in every language" {
     assert "safe account" in scam_keywords_hit("move to SAFE ACCOUNT now");
     assert len(scam_keywords_hit("police case eka")) > 0;
     assert scam_keywords_hit("I decide to pay CEB") == [];
+}
+
+test "no key: every Jev function returns its type with source fallback" {
+    os.environ["TYPESAFE_API_KEY"] = "";
+    assert jev_call({"a": 1}, {"q": {"type": "noul", "instructions": "x?"}}) is None;
+    rv = jev_request_vector(scam_state("safe account"));
+    assert isinstance(rv, RiskVector) and rv.source == "fallback";
+    assert jev_pressure(SCAM_TEL, {"action": "BREAK_FD", "amount": 4200000}).source == "fallback";
+    assert isinstance(jev_pattern({"reference_text": "x"}, ["Fake CID — safe account"]), str);
+    assert jev_last("jev_pattern")["source"] == "fallback";
+    assert jev_read_reply("yes") in ["COACHED", "NOT_COACHED", "UNSURE"];
+    assert jev_last("jev_read_reply")["source"] == "fallback";
+    s = jev_mule_scores([{"id": "A-1", "opened_days_ago": 5}]);
+    assert isinstance(s["A-1"], float) and jev_last("jev_mule_scores")["source"] == "fallback";
+    assert jev_mule_scores([]) == {};
+}
+
+test "timeout: a slow Jev answer falls back fast" {
+    os.environ["TYPESAFE_API_KEY"] = "test-dummy-key";
+    os.environ["JEV_TIMEOUT_MS"] = "1";
+    t0 = time.perf_counter();
+    rv = jev_request_vector(scam_state("timeout test " + str(t0)));   # unique state: never cached
+    ms = int((time.perf_counter() - t0) * 1000);
+    os.environ["TYPESAFE_API_KEY"] = "";
+    os.environ["JEV_TIMEOUT_MS"] = "800";
+    assert rv.source == "fallback";
+    assert rv.decision == "HOLD";
+    assert ms < 300, f"took {ms} ms";
 }
