@@ -47,10 +47,15 @@ def:pub obj(value: object) -> dict[str, any] {
     return (value or {}) as dict[str, any];
 }
 
-"""First report of a walker spawn as a dict ({} if none)."""
-def:pub first_report(result: any) -> dict[str, any] {
+"""The API walker's own report ({} if none). It is the LAST one: reports of walkers it spawned come first."""
+def:pub last_report(result: any) -> dict[str, any] {
     reports = rows(result.reports);
-    return reports[0] if len(reports) > 0 else {};
+    return reports[len(reports) - 1] if len(reports) > 0 else {};
+}
+
+"""Wait ms milliseconds: `await pause(1200);` inside an async def."""
+def:pub pause(ms: int) -> any {
+    return new(Promise, lambda (resolve: any) { setTimeout(resolve, ms); });  # jac:ignore[E1053]
 }
 
 """True if text is one or more digits 0-9 (str.isdigit() does not exist in the browser runtime)."""

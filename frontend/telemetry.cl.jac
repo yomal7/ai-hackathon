@@ -3,13 +3,15 @@ import from react { useEffect }
 import from "@jac/runtime" { Link }
 import from "qrcode.react" { QRCodeSVG }
 import from .i18n { t, tf }
-import from .ui { Header, Card, Bar, Badge, theme, pressure_color, first_report }
+import from .ui { Header, Card, Bar, Badge, theme, pressure_color, last_report, rows, pause }
 import from .voice { useVoices, pick_voice, speak }
 
-sv import from ..walkers.api { run_scenario, reset_demo, telemetry_update, get_phone }
+sv import from ..walkers.api { run_scenario, reset_demo, telemetry_update, get_phone, submit_request }
 
 glob LANG: str = "en";
 glob SCENARIOS: list[str] = ["S1", "S2", "S3", "S4", "S5"];
+glob LIVE: list[str] = ["S3", "S4"];    # replayed step by step so the pressure meter climbs on screen
+glob STEP_MS: int = 1200;
 glob TOGGLES: list[dict[str, str]] = [
     {"signal": "on_call", "key": "tele.on_call"},
     {"signal": "remote_app", "key": "tele.remote_app"},
@@ -89,7 +91,7 @@ def:pub Telemetry() -> JsxElement {
     voices = useVoices();
 
     async def load() {
-        phone = first_report(root spawn get_phone(request_id="latest:" + elder));
+        phone = last_report(root spawn get_phone(request_id="latest:" + elder));
         if phone {
             pressure = phone["pressure"] as int;
             screen = phone["screen"] as str;
@@ -108,13 +110,30 @@ def:pub Telemetry() -> JsxElement {
         change: dict[str, any] = {};
         change[signal] = value;
         signals = {**signals, **change};
-        sent = first_report(root spawn telemetry_update(request_id="", signals=change));
+        sent = last_report(root spawn telemetry_update(request_id="", signals=change));
         pressure = sent["pressure"] as int;
     }
 
     async def run(name: str) {
-        started = first_report(root spawn run_scenario(name=name));
-        last = t("scenario." + name, LANG) + " → " + (started["request_id"] as str);
+        title = t("scenario." + name, LANG);
+        if name not in LIVE {
+            started = last_report(root spawn run_scenario(name=name));
+            last = title + " → " + (started["request_id"] as str);
+            return;
+        }
+        # Live: build the request, send the phone's signals one by one, then call the Bank Council.
+        started = last_report(root spawn run_scenario(name=name, live=True));
+        rid = started["request_id"] as str;
+        steps = rows(started["steps"]);
+        for (i, step) in enumerate(steps) {
+            last = tf("tele.step", LANG, {"name": title, "n": i + 1, "total": len(steps)});
+            await pause(STEP_MS);
+            sent = last_report(root spawn telemetry_update(request_id=rid, signals=step));
+            pressure = sent["pressure"] as int;
+        }
+        await pause(STEP_MS);
+        root spawn submit_request(request_id=rid);
+        last = title + " → " + rid;
     }
 
     async def reset() {
