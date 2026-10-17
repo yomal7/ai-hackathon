@@ -1,121 +1,200 @@
-# Language helpers + fixed fallback texts in si / ta / en. STUB written by A - B owns and replaces this file (B)
+"""Languages for Rakshaka (owner: Person B): script detection, scam keywords,
+and fixed fallback texts in Sinhala (si), Tamil (ta) and English (en)."""
+
 import re;
 
-# Scam keywords per scam type. Sinhala, Tamil, English, Singlish, Tanglish.
-# Sinhala / Tamil words: to be checked by a native speaker.
-glob SCAM_WORDS: dict[str, list[str]] = {
-    "FAKE_POLICE_SAFE_ACCOUNT": [
-        "safe account", "cid", "police", "arrest", "drug case", "government account",
-        "police case eka", "safe account ekata",
-        "ආරක්ෂිත ගිණුම", "පොලිසිය", "සීඅයිඩී", "අත්අඩංගුවට",
-        "பாதுகாப்பான கணக்கு", "காவல்துறை", "கைது"
-    ],
-    "CUSTOMS_PARCEL_FEE": ["customs", "parcel", "customs fee kattanum", "රේගු", "சுங்க"],
-    "LOTTERY_FEE": ["lottery", "prize", "ලොතරැයි", "லாட்டரி"],
-    "FAKE_BANK_STAFF": ["bank officer", "verify your account", "share otp"],
-    "INVESTMENT_DOUBLE": ["double your money", "guaranteed return"],
-    "ROMANCE": ["my love", "send gift money"]
-};
+# ---------- language detection (plain code, by Unicode script) ----------
 
-"""Script check in code: Sinhala or Tamil letters win, else English."""
 def detect_language(text: str) -> str {
-    for ch in text {
-        code = ord(ch);
-        if code >= 0x0D80 and code <= 0x0DFF {
-            return "si";
-        }
-        if code >= 0x0B80 and code <= 0x0BFF {
-            return "ta";
-        }
+    si = 0;
+    ta = 0;
+    for ch in (text or "") {
+        c = ord(ch);
+        if 0x0D80 <= c and c <= 0x0DFF { si += 1; }
+        elif 0x0B80 <= c and c <= 0x0BFF { ta += 1; }
     }
-    return "en";
+    if si == 0 and ta == 0 { return "en"; }    # Singlish / Tanglish count as "en"
+    return "si" if si >= ta else "ta";
 }
 
-"""Keyword fallback for all 3 languages. Returns the keywords found."""
+"""True if text uses no OTHER Indian script than its own (e.g. no Malayalam inside Tamil)."""
+def script_clean(text: str, lang: str) -> bool {
+    block = {"si": (0x0D80, 0x0DFF), "ta": (0x0B80, 0x0BFF)}.get(lang, (0, 0));    # this language's Unicode block
+    for ch in text {
+        c = ord(ch);
+        if 0x0900 <= c and c <= 0x0DFF and not (block[0] <= c and c <= block[1]) { return False; }
+    }
+    return True;
+}
+
+def safe_lang(lang: str) -> str {
+    return lang if lang in ["si", "ta", "en"] else "en";
+}
+
+# ---------- scam keywords, grouped by scam type ----------
+# Sinhala / Tamil / Singlish / Tanglish lists: to be checked by a native speaker.
+glob SCAM_KEYWORDS: dict[str, list[str]] = {
+    "FAKE_POLICE_SAFE_ACCOUNT": [
+        "safe account", "cid", "police", "arrest", "warrant", "don't tell anyone",
+        "dont tell anyone", "government account",
+        "ආරක්ෂිත ගිණුම", "පොලිසිය", "පොලිස්", "සීඅයිඩී", "අත්අඩංගුවට",          # si
+        "பாதுகாப்பான கணக்கு", "காவல்துறை", "கைது", "போலீஸ்", "சிஐடி",            # ta
+        "police case eka", "safe account ekata", "cid eken", "police case irukku"  # Singlish / Tanglish
+    ],
+    "CUSTOMS_PARCEL_FEE": [
+        "customs", "parcel fee", "රේගුව", "சுங்கம்", "customs fee kattanum"
+    ],
+    "LOTTERY_FEE": ["lottery", "prize", "ලොතරැයි", "லாட்டரி"],
+    "INVESTMENT_DOUBLE": ["double your money"],
+    "FAKE_BANK_STAFF": ["bank officer", "bank staff", "verify your account"]
+};
+
+# Reply words for the Scam-Breaker. To be checked by a native speaker.
+glob YES_WORDS: list[str] = ["yes", "yeah", "ow", "ou", "aam", "ama", "ඔව්", "ஆம்", "ஆமா", "ஆமாம்"];
+glob NO_WORDS: list[str] = ["no", "nope", "nobody", "naha", "nae", "illai", "illa",
+                            "නැහැ", "නෑ", "இல்லை", "இல்ல"];
+
+def _is_latin(word: str) -> bool {
+    return detect_language(word) == "en";
+}
+
+"""True if kw appears in text. Latin words must match whole words ("cid" not in "decide")."""
+def has_word(text: str, kw: str) -> bool {
+    low = (text or "").lower();
+    if _is_latin(kw) {
+        return re.search("(?<![a-z])" + re.escape(kw.lower()) + "(?![a-z])", low) is not None;
+    }
+    return kw in low;
+}
+
 def scam_keywords_hit(text: str) -> list[str] {
-    low = text.lower();
     hits: list[str] = [];
-    for words in SCAM_WORDS.values() {
-        for w in words {
-            # ASCII words need whole-word match ("cid" must not hit "decided")
-            found = (re.search(r"\b" + re.escape(w) + r"\b", low) is not None) if w.isascii() else (w in low);
-            if found and w not in hits {
-                hits.append(w);
-            }
+    for (_, words) in SCAM_KEYWORDS.items() {
+        for kw in words {
+            if has_word(text, kw) and kw not in hits { hits.append(kw); }
         }
     }
     return hits;
 }
 
-"""Which scam type the keyword hits point to, or NONE."""
-def scam_type_of(hits: list[str]) -> str {
-    for (kind, words) in SCAM_WORDS.items() {
-        for h in hits {
-            if h in words {
-                return kind;
-            }
-        }
+"""Scam type with the most keyword hits, or NONE."""
+def scam_type_from_text(text: str) -> str {
+    best = "NONE";
+    best_n = 0;
+    for (kind, words) in SCAM_KEYWORDS.items() {
+        n = len([kw for kw in words if has_word(text, kw)]);
+        if n > best_n { best = kind; best_n = n; }
     }
-    return "NONE";
+    return best;
 }
 
-"""Pick the text for a language, English if missing."""
-def pick(texts: dict[str, any], language: str) -> any {
-    return texts[language] if language in texts else texts["en"];
+def keywords_for(scam_type: str) -> list[str] {
+    return SCAM_KEYWORDS.get(scam_type, []);
 }
 
-# ---- Fixed fallback texts (si / ta: to be checked by a native speaker) ----
-
-glob SCAM_QUESTIONS: dict[str, list[str]] = {
-    "en": [
-        "Is someone on the phone telling you to make this transfer?",
-        "Did the caller say they are from the police, CID or the bank?",
-        "Did they tell you not to tell your family?"
-    ],
-    "si": [
-        "මෙම මුදල් යැවීම කරන්න කියලා කවුරුහරි දැන් දුරකථනයෙන් ඔබට කියනවාද?",
-        "ඇමතුම ගත් අය පොලිසියෙන්, සීඅයිඩී එකෙන් හෝ බැංකුවෙන් කියලා කිව්වාද?",
-        "පවුලේ අයට නොකියන්න කියලා ඔවුන් ඔබට කිව්වාද?"
-    ],
-    "ta": [
-        "இந்தப் பணப் பரிமாற்றத்தைச் செய்யுமாறு யாராவது தொலைபேசியில் சொல்கிறார்களா?",
-        "அழைத்தவர் காவல்துறை, சிஐடி அல்லது வங்கியிலிருந்து என்று சொன்னாரா?",
-        "குடும்பத்தினரிடம் சொல்ல வேண்டாம் என்று சொன்னார்களா?"
-    ]
+# ---------- fixed fallback texts (si / ta / en) ----------
+# All si / ta strings: to be checked by a native speaker.
+glob FIXED: dict[str, dict[str, str]] = {
+    # Scam-Breaker questions
+    "sb_q1": {
+        "en": "Is someone on the phone telling you to do this?",
+        "si": "දැන් කවුරුහරි දුරකථනයෙන් ඔබට මෙය කරන්න කියනවාද?",
+        "ta": "யாராவது இப்போது தொலைபேசியில் இதைச் செய்யச் சொல்கிறார்களா?"
+    },
+    "sb_q2": {
+        "en": "Did they say they are police, CID or bank staff?",
+        "si": "ඔවුන් පොලිසියෙන්, සීඅයිඩී එකෙන් හෝ බැංකුවෙන් කියලා කිව්වාද?",
+        "ta": "அவர்கள் தங்களை காவல்துறை, சிஐடி அல்லது வங்கி ஊழியர் என்று சொன்னார்களா?"
+    },
+    "sb_q3": {
+        "en": "Did they tell you not to tell your family?",
+        "si": "මේ ගැන පවුලේ අයට කියන්න එපා කියලා ඔවුන් කිව්වාද?",
+        "ta": "இதைப் பற்றி உங்கள் குடும்பத்தினரிடம் சொல்ல வேண்டாம் என்று சொன்னார்களா?"
+    },
+    "sb_warning": {
+        "en": "Police and banks never ask you to move money to a safe account. Please stop and talk to your family.",
+        "si": "පොලිසිය හෝ බැංකු කිසිම දවසක ඔබේ මුදල් 'ආරක්ෂිත ගිණුමකට' දාන්න කියන්නේ නැහැ. කරුණාකර නවතින්න, ඔබේ පවුලේ අය එක්ක කතා කරන්න.",
+        "ta": "காவல்துறையோ வங்கியோ ஒருபோதும் பணத்தை 'பாதுகாப்பான கணக்கிற்கு' மாற்றச் சொல்லாது. தயவுசெய்து நிறுத்தி, உங்கள் குடும்பத்தினருடன் பேசுங்கள்."
+    },
+    "sb_guardian_asked": {
+        "en": "We have asked {guardian} to check this payment with you. Please wait.",
+        "si": "මෙම ගෙවීම ඔබ සමඟ පරීක්ෂා කරන්න අපි {guardian}ට කිව්වා. කරුණාකර ටිකක් ඉන්න.",
+        "ta": "இந்தப் பணப்பரிமாற்றத்தை உங்களுடன் சரிபார்க்க {guardian} அவர்களிடம் கேட்டுள்ளோம். தயவுசெய்து காத்திருங்கள்."
+    },
+    # Guardian card
+    "parent_father": {"en": "father", "si": "තාත්තා", "ta": "அப்பா"},
+    "parent_mother": {"en": "mother", "si": "අම්මා", "ta": "அம்மா"},
+    "gc_title": {
+        "en": "Please check: your {parent} is sending Rs {amount}",
+        "si": "කරුණාකර බලන්න: ඔබේ {parent} රු. {amount}ක් යවන්න හදනවා",
+        "ta": "தயவுசெய்து பாருங்கள்: உங்கள் {parent} ரூ. {amount} அனுப்புகிறார்"
+    },
+    "gc_title_generic": {
+        "en": "Please check a payment from your family",
+        "si": "කරුණාකර ඔබේ පවුලේ අයෙකුගේ ගෙවීමක් බලන්න",
+        "ta": "தயவுசெய்து உங்கள் குடும்பத்தினரின் ஒரு பணப்பரிமாற்றத்தைப் பாருங்கள்"
+    },
+    "gc_line_call": {
+        "en": "{name} is trying to send Rs {amount} to a new account while on a phone call.",
+        "si": "{name} දුරකථන ඇමතුමක සිටිමින් අලුත් ගිණුමකට රු. {amount}ක් යවන්න හදනවා.",
+        "ta": "{name} தொலைபேசியில் பேசிக்கொண்டே புதிய கணக்கிற்கு ரூ. {amount} அனுப்ப முயல்கிறார்."
+    },
+    "gc_line_others": {
+        "en": "{others} other elders sent money to this account today.",
+        "si": "අද තවත් වැඩිහිටියන් {others} දෙනෙක් මේ ගිණුමට මුදල් යැව්වා.",
+        "ta": "இன்று மேலும் {others} முதியவர்கள் இந்தக் கணக்கிற்கு பணம் அனுப்பியுள்ளனர்."
+    },
+    "gc_line_paused": {
+        "en": "The bank has paused it for safety.",
+        "si": "ආරක්ෂාව සඳහා බැංකුව එය නතර කර තිබෙනවා.",
+        "ta": "பாதுகாப்பிற்காக வங்கி இதை நிறுத்தி வைத்துள்ளது."
+    },
+    "opt_reject": {"en": "Reject", "si": "ප්‍රතික්ෂේප කරන්න", "ta": "நிராகரிக்கவும்"},
+    "opt_approve": {"en": "Approve", "si": "අනුමත කරන්න", "ta": "அனுமதிக்கவும்"},
+    "opt_call": {"en": "Call now", "si": "දැන් කතා කරන්න", "ta": "இப்போதே அழைக்கவும்"},
+    # Debrief (4 lines)
+    "db_1": {
+        "en": "A caller pretending to be police told {name} to move Rs {amount} to a 'safe account'.",
+        "si": "පොලිසිය ලෙස පෙනී සිටි අයෙක් රු. {amount}ක් 'ආරක්ෂිත ගිණුමකට' දාන්න කියා {name}ට කිව්වා.",
+        "ta": "காவல்துறை போல நடித்த ஒருவர் ரூ. {amount} பணத்தை 'பாதுகாப்பான கணக்கிற்கு' மாற்றச் சொல்லி {name} அவர்களிடம் கூறினார்."
+    },
+    "db_2": {
+        "en": "Rakshaka noticed the pressure and paused the payment in {seconds} seconds.",
+        "si": "රක්ෂක එම පීඩනය හඳුනාගෙන තත්පර {seconds}කින් ගෙවීම නතර කළා.",
+        "ta": "ரக்ஷகா அந்த அழுத்தத்தைக் கவனித்து {seconds} வினாடிகளில் பணப்பரிமாற்றத்தை நிறுத்தியது."
+    },
+    "db_3": {
+        "en": "{guardian} checked and said no. Rs {amount} stayed safe.",
+        "si": "{guardian} පරීක්ෂා කර එය ප්‍රතික්ෂේප කළා. රු. {amount} ආරක්ෂිතව තිබෙනවා.",
+        "ta": "{guardian} சரிபார்த்து வேண்டாம் என்றார். ரூ. {amount} பாதுகாப்பாக உள்ளது."
+    },
+    "db_4": {
+        "en": "The bank network learned this scam and recovered Rs {recovered} for another elder.",
+        "si": "බැංකු ජාලය මෙම වංචාව ඉගෙනගෙන තවත් වැඩිහිටියෙකුට රු. {recovered}ක් නැවත ලබා දුන්නා.",
+        "ta": "வங்கி வலையமைப்பு இந்த மோசடியைக் கற்றுக்கொண்டு இன்னொரு முதியவருக்கு ரூ. {recovered} மீட்டுக் கொடுத்தது."
+    }
 };
 
-glob SCAM_WARNING: dict[str, str] = {
-    "en": "Police and banks never ask you to move money to a 'safe account'.",
-    "si": "පොලිසිය හෝ බැංකු කිසිවිටෙක 'ආරක්ෂිත ගිණුමකට' මුදල් යවන්න කියන්නේ නැහැ.",
-    "ta": "காவல்துறையோ வங்கியோ ஒருபோதும் 'பாதுகாப்பான கணக்கிற்கு' பணம் அனுப்பச் சொல்லாது."
+# Analyst card texts: English only (the analyst reads English).
+glob ANALYST_TEXT: dict[str, str] = {
+    "ac_title": "Please review: {summary}",
+    "ac_no_evidence": "No extra evidence was given.",
+    "opt_approve_freeze": "Approve freeze",
+    "opt_keep_open": "Keep open"
 };
 
-glob GUARDIAN_TITLE: dict[str, str] = {
-    "en": "Urgent: please check this transfer",
-    "si": "හදිසියි: කරුණාකර මෙම මුදල් යැවීම පරීක්ෂා කරන්න",
-    "ta": "அவசரம்: இந்தப் பணப் பரிமாற்றத்தைச் சரிபார்க்கவும்"
-};
+"""Fixed text for key in lang (si/ta/en), with {placeholders} filled from values.
+Missing values stay visible as "{key}" instead of crashing."""
+def fixed_text(key: str, lang: str, values: dict | None = None) -> str {
+    texts = FIXED.get(key, {});
+    out = texts.get(safe_lang(lang), texts.get("en", key));
+    for (k, v) in (values or {}).items() {
+        out = out.replace("{" + str(k) + "}", str(v));
+    }
+    return out;
+}
 
-glob GUARDIAN_LINES: dict[str, list[str]] = {
-    "en": [
-        "Your parent is trying to send a large amount to a new account.",
-        "They may be on a call with a scammer right now.",
-        "Reject to stop it, or call them now."
-    ],
-    "si": [
-        "ඔබේ දෙමාපියන් නව ගිණුමකට විශාල මුදලක් යැවීමට උත්සාහ කරනවා.",
-        "ඔවුන් දැන් වංචාකරුවෙකු සමඟ දුරකථනයෙන් කතා කරනවා විය හැකියි.",
-        "නැවැත්වීමට ප්‍රතික්ෂේප කරන්න, නැත්නම් දැන්ම ඔවුන්ට කතා කරන්න."
-    ],
-    "ta": [
-        "உங்கள் பெற்றோர் புதிய கணக்கிற்கு பெரிய தொகையை அனுப்ப முயல்கிறார்.",
-        "அவர் இப்போது ஒரு மோசடிக்காரருடன் தொலைபேசியில் இருக்கலாம்.",
-        "நிறுத்த நிராகரிக்கவும், அல்லது இப்போதே அவரை அழைக்கவும்."
-    ]
-};
-
-glob DEBRIEF: dict[str, str] = {
-    "en": "A caller pretended to be the police.\nHe asked for a transfer to a 'safe account'.\nRakshaka held the money and your family said no.\nYour savings are safe.",
-    "si": "ඇමතුම ගත් අය පොලිසිය ලෙස රඟපෑවා.\n'ආරක්ෂිත ගිණුමකට' මුදල් යවන්න කිව්වා.\nරක්ෂක මුදල් නවත්වා ඔබේ පවුල එය ප්‍රතික්ෂේප කළා.\nඔබේ ඉතුරුම් ආරක්ෂිතයි.",
-    "ta": "அழைத்தவர் காவல்துறை என்று நடித்தார்.\n'பாதுகாப்பான கணக்கிற்கு' பணம் அனுப்பச் சொன்னார்.\nரக்ஷகா பணத்தை நிறுத்தியது, உங்கள் குடும்பம் மறுத்தது.\nஉங்கள் சேமிப்பு பாதுகாப்பாக உள்ளது."
-};
+"""Rs amount with thousands commas: 4200000 -> "4,200,000"."""
+def fmt_rs(amount: float) -> str {
+    return f"{int(round(amount)):,}";
+}
