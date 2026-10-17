@@ -53,6 +53,19 @@ def:pub first_report(result: any) -> dict[str, any] {
     return reports[0] if len(reports) > 0 else {};
 }
 
+"""True if text is one or more digits 0-9 (str.isdigit() does not exist in the browser runtime)."""
+def:pub only_digits(text: str) -> bool {
+    if not text {
+        return False;
+    }
+    for ch in text {
+        if ch not in "0123456789" {
+            return False;
+        }
+    }
+    return True;
+}
+
 """Load Noto Sans Sinhala / Tamil + Inter once."""
 def:pub load_fonts() {
     if document.getElementById("rk-fonts") {

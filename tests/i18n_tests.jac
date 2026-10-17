@@ -22,12 +22,13 @@ def dictionary(name: str) -> dict[str, str] {
     return {k: v for (k, v) in pairs};
 }
 
-"""Every literal key passed to t(...) / tf(...) in the frontend files."""
+"""Every literal key passed to t(...) / tf(...), or stored as "key": "..." in a table, in the frontend files."""
 def used_keys() -> set[str] {
     keys: set[str] = set();
     for path in files.glob(os.path.join(FRONTEND, "*.cl.jac")) {
-        found = re.findall(r'\bt[f]?\("([a-z_]+\.[A-Za-z0-9_.]+)"', read_text(path)) as list[str];
-        keys.update(found);
+        src = read_text(path);
+        keys.update(re.findall(r'\bt[f]?\("([a-z_]+\.[A-Za-z0-9_.]+)"', src) as list[str]);
+        keys.update(re.findall(r'"key":\s*"([a-z_]+\.[A-Za-z0-9_.]+)"', src) as list[str]);
     }
     return keys;
 }
@@ -40,14 +41,20 @@ glob DYNAMIC: list[str] = (
     + ["scenario." + s for s in ["S1", "S2", "S3", "S4", "S5"]]
     + ["state." + s for s in ["normal", "active", "suspect", "mule", "blocked", "frozen", "safe"]]
     + ["lang." + c for c in ["si", "ta", "en"]]
+    + ["tele.lang_name." + c for c in ["si", "ta", "en"]]
     + ["pressure.calm", "pressure.rising", "pressure.high"]
     + [f"result.{r}.{p}" for r in ["allowed", "blocked", "held", "step_up"] for p in ["title", "body"]]
     + ["nav.phone", "nav.war_room", "nav.guardian", "nav.story", "guardian.reject", "guardian.approve", "guardian.call"]
 );
 
+"""A used key is fine if it exists, or is a prefix that real keys extend ("result.held" -> "result.held.title")."""
+def known(key: str, en: dict[str, str]) -> bool {
+    return key in en or len([k for k in en if k.startswith(key + ".")]) > 0;
+}
+
 test "every used key has English text" {
     en = dictionary("EN");
-    missing = sorted([k for k in used_keys() if k not in en]);
+    missing = sorted([k for k in used_keys() if not k.endswith(".") and not known(k, en)]);
     assert missing == [], f"keys used in frontend but missing in EN: {missing}";
 }
 
