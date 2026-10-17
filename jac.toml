@@ -1,12 +1,16 @@
-# TEMPORARY (Person B, branch b-ai) — Person A's jac.toml replaces this on merge.
-# A: please keep the [plugins.byllm.model] block below in the real file.
+# Rakshaka — Jac project file. Person A owns it; B added the AI parts.
 [project]
 name = "rakshaka"
 version = "0.1.0"
 description = "Rakshaka — AI agent network protecting elders from phone scams (simulation)"
 entry-point = "main.jac"
+jac-version = "==0.34.24"          # JacHammer / judging version (native jac binary)
 
+# Python packages our code imports (JacHammer and `jac install` install these).
 [dependencies]
+httpx = ">=0.27"
+python-dotenv = ">=1.0"
 
-[plugins.byllm.model]
+# LLM for `by llm()` (Gemini). The key comes from the GEMINI_API_KEY env var.
+[byllm.model]
 default_model = "gemini/gemini-3.5-flash-lite"

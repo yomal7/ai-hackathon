@@ -6,8 +6,7 @@ Safety: the LLM never sets numbers — any number it writes must be in the input
 import json;
 import threading;
 import from functools { partial }
-import from byllm.lib { Model }
-import from ai.env { llm_model_name }
+import from ai.env { make_llm }
 import from ai.fallback { as_str }
 import from ai.types { ScamPatternDraft }
 import from ai.lang { safe_lang, detect_language }
@@ -52,7 +51,7 @@ obj Action {
     has why: str;
 }
 
-glob llm: Model = Model(model_name=llm_model_name());
+glob llm: any = make_llm();      # works on Jac 0.16 and 0.34 (see ai/env.jac)
 
 glob LANG_NAME: dict[str, str] = {
     "si": "Sinhala, in Sinhala script",

@@ -16,14 +16,13 @@ glob CACHE_FILE: str = os.path.join(ROOT, ".cache", "llm_cache.json");
 glob _pool: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=4);
 glob _lock: threading.Lock = threading.Lock();
 glob _cache: dict = {};
-glob _cache_loaded: bool = False;
+glob _state: dict[str, bool] = {"loaded": False};     # a dict, so no `global` is needed (works on Jac 0.16 and 0.34)
 
 # ---------- cache ----------
 
 def _load_cache() -> None {
-    global _cache_loaded;
-    if _cache_loaded { return; }
-    _cache_loaded = True;
+    if _state["loaded"] { return; }
+    _state["loaded"] = True;
     try {
         with open(CACHE_FILE, encoding="utf-8") as fh { _cache.update(dict(json.load(fh))); }
     } except Exception {}    # no cache file yet

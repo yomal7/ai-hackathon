@@ -19,10 +19,10 @@ def detect_language(text: str) -> str {
 
 """True if text uses no OTHER Indian script than its own (e.g. no Malayalam inside Tamil)."""
 def script_clean(text: str, lang: str) -> bool {
-    own = {"si": (0x0D80, 0x0DFF), "ta": (0x0B80, 0x0BFF)}.get(lang, (0, 0));
+    block = {"si": (0x0D80, 0x0DFF), "ta": (0x0B80, 0x0BFF)}.get(lang, (0, 0));    # this language's Unicode block
     for ch in text {
         c = ord(ch);
-        if 0x0900 <= c and c <= 0x0DFF and not (own[0] <= c and c <= own[1]) { return False; }
+        if 0x0900 <= c and c <= 0x0DFF and not (block[0] <= c and c <= block[1]) { return False; }
     }
     return True;
 }

@@ -39,6 +39,11 @@ def trace() -> dict[str, str] {
     return _ids;
 }
 
+"""Sort key for "H:MM" / "HH:MM" times."""
+def _clock_key(t: str) -> str {
+    return t.zfill(5);
+}
+
 """The account with this id (fails the test if missing)."""
 def acc(account_id: str) -> Account {
     a = find_account(account_id);
@@ -50,7 +55,7 @@ test "time parsing and money flows in time order" {
     assert to_minutes("10:20") == 620 and to_minutes("2026-10-17T10:20:00") == 620 and to_minutes("") is None;
     mule = acc(trace()["LDB-77821"]);
     outs = [f.time for f in paid_out(mule)];
-    assert outs == sorted(outs, key=lambda t: str : str(t).zfill(5));
+    assert outs == sorted(outs, key=_clock_key);
     assert len(paid_in(mule)) == 2;
 }
 
