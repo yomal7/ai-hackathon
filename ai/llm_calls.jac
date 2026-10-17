@@ -29,7 +29,7 @@ def scam_questions(situation: str, language: str) -> dict {
 }
 
 """Guardian card: title + max 3 lines + options, in the guardian's language."""
-def guardian_card(summary: str, evidence: list[str], language: str) -> dict {
+def guardian_card(summary: str, evidence: list[str], language: str, facts: dict | None = None) -> dict {
     return {
         "language": language,
         "title": pick(GUARDIAN_TITLE, language),
@@ -50,6 +50,6 @@ def analyst_card(summary: str, evidence: list[str]) -> dict {
 }
 
 """4 short lines telling the person what happened."""
-def debrief(`case: dict, language: str) -> str {
+def debrief(case_info: dict, language: str) -> str {
     return str(pick(DEBRIEF, language));
 }

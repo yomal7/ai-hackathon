@@ -11,5 +11,5 @@ walker ApplyAnalystAnswer {
 
 """Network part of the War Room data."""
 def network_state() -> dict {
-    return {"walk": None, "signals": [], "alerts": [], "recovered_rs": 0};
+    return {"signals": [], "alerts": [], "walk": None, "recovered_rs": 0, "held": {}, "timeline": [], "patterns": []};
 }

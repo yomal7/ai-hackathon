@@ -30,6 +30,11 @@ watchdog = ">=3.0.0"
 [serve]
 base_route_app = "app"
 
+# The graph topology index makes every edge write re-encode the whole graph (O(edges^2) seeding)
+# and every typed read decode it (~12 ms). Our graph is small and in memory: walking edges is faster.
+[run]
+topology_index = false
+
 [test]
 directory = "tests"
 
