@@ -8,7 +8,7 @@ import from agents.network.network { RunNetwork, ApplyAnalystAnswer, network_sta
 import from agents.network.pattern_learner { pattern_catalog }
 import from agents.network.net_common { find_account, find_alert, reset_network, TOTALS }
 import from ai.jev { jev_pattern }
-import from tests.net_story { build_story }
+import from tests.net_story { forget_test_graph, build_story }
 
 with entry {
     for k in ["TYPESAFE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"] {
@@ -131,4 +131,11 @@ test "network_state shape for the War Room" {
     assert all([set(a.keys()) >= {"id", "kind", "language", "title", "lines", "options", "status", "answer"} for a in mine]);
     agents = set([t["agent"] for t in st["timeline"]]);
     assert {"NETWORK", "PATTERN_LEARNER", "MONEY_TRACER", "LIAISON_CDB"}.issubset(agents);
+}
+
+# Runs last (tests run in file order on Jac 0.16): leave the shared graph as we found it,
+# so other test files (A's War Room / seed tests) do not see our test stories.
+test "zz clean up this file's test stories" {
+    forget_test_graph(True);
+    assert True;
 }

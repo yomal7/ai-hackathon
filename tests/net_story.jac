@@ -12,36 +12,50 @@ obj Story {
     has request: Request;         # Seeya's blocked S3 request
 }
 
-glob MARK: str = "TST";       # every test id contains this, so old test stories can be removed
-glob MAX_AGE_S: int = 600;    # only stories older than this are removed (tests may run in parallel)
+glob MARK: str = "TST";       # every test id contains this, so test stories can be removed
+glob MAX_AGE_S: int = 600;    # stories from crashed runs are removed after this many seconds
+glob MINE: list[str] = [];    # markers created by THIS process (safe with parallel test workers)
 
-"""A fresh marker: TST<unix seconds>x<random>, e.g. TST1760700000xa1b2."""
+"""A fresh marker: TST<unix seconds>x<random>, e.g. TST1760700000xa1b2. Remembered in MINE."""
 def new_mark() -> str {
-    return f"{MARK}{int(time.time())}x{uuid.uuid4().hex[:4]}";
+    m = f"{MARK}{int(time.time())}x{uuid.uuid4().hex[:4]}";
+    MINE.append(m);
+    return m;
 }
 
-"""True for an OLD test node (marker older than MAX_AGE_S, or an old marker without a time)."""
+"""True for a test marker older than MAX_AGE_S (or an old marker without a time)."""
 def _old_mark(text: str) -> bool {
     if MARK not in text { return False; }
     m = re.search(MARK + "(\d{9,})x", text);
     return m is None or time.time() - int(m.group(1)) > MAX_AGE_S;
 }
 
-def _marked(n: any) -> bool {
-    return _old_mark(str(getattr(n, "id", ""))) or _old_mark(str(getattr(n, "name", "")));
+def _gone(text: str, only_mine: bool) -> bool {
+    if only_mine {
+        for m in MINE {
+            if m in text { return True; }
+        }
+        return False;
+    }
+    return _old_mark(text);
 }
 
-"""Disconnect old test stories from root (Jac keeps the graph between runs; this keeps tests fast)."""
-def forget_test_graph() -> None {
+def _marked(n: any, only_mine: bool) -> bool {
+    return _gone(str(getattr(n, "id", "")), only_mine) or _gone(str(getattr(n, "name", "")), only_mine);
+}
+
+"""Disconnect test stories from root (Jac keeps the graph between runs and between test files).
+only_mine=False: stories older than MAX_AGE_S. only_mine=True: every story this process made."""
+def forget_test_graph(only_mine: bool = False) -> None {
     for n in [root -->] {
         if isinstance(n, ScamPattern) {
             for r in [n ->:LearnedFrom:->] {
-                if _marked(r) { for e in [edge n ->:LearnedFrom:-> r] { del e; } }
+                if _marked(r, only_mine) { for e in [edge n ->:LearnedFrom:-> r] { del e; } }
             }
-            if _old_mark(n.learned_from) and not [n ->:LearnedFrom:->] {
+            if _gone(n.learned_from, only_mine) and not [n ->:LearnedFrom:->] {
                 for e in [edge root --> n] { del e; }
             }
-        } elif _marked(n) {
+        } elif _marked(n, only_mine) {
             for e in [edge root --> n] { del e; }
         }
     }

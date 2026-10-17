@@ -2,6 +2,7 @@
 # Order: Coercion Sentinel reading -> PLACE_TIME -> ROUTINE -> MULE_RING -> PATTERN -> ADVOCATE -> rules R1-R6.
 # Agents never call each other; each one writes a Proposal on the Request (the graph is the blackboard).
 import time;
+import from operator { attrgetter }
 import from graph.nodes {
     Citizen, Account, Request, Ruling, Signal, Alert, Guardian, Proposal,
     Decision, Assurance, RequestStatus, SignalKind, AlertKind, AlertStatus, Lang
@@ -32,7 +33,7 @@ glob STATUS_FOR: dict[str, RequestStatus] = {
 
 """Latest Ruling on a request, or None."""
 def ruling_of(req: Request) -> Ruling | None {
-    found = sorted([req ->:Decided:->], key=lambda r: Ruling: r.at);
+    found = sorted([req ->:Decided:->], key=attrgetter("at"));
     return found[-1] if found else None;
 }
 
@@ -65,7 +66,7 @@ def summary_of(req: Request) -> str {
 
 """The strongest risk reasons from the council (max 3)."""
 def evidence_of(req: Request) -> list[str] {
-    props = sorted([p for p in proposals_of(req) if risk_of(p) >= 0.5], key=lambda p: Proposal: -risk_of(p));
+    props = sorted([p for p in proposals_of(req) if risk_of(p) >= 0.5], key=risk_of, reverse=True);
     return [p.reason for p in props][:3];
 }
 
@@ -99,8 +100,8 @@ def raise_guardian_alert(req: Request, locked: bool) -> Alert | None {
 def emit_signals(req: Request, r: Ruling, kinds: list[str]) {
     c = citizen_of(req);
     payee = payee_of(req);
-    own = [a for a in [c ->:Owns:->] if not a.is_fd] if c is not None else [];
-    subject = own[0] if own else None;
+    mine = [a for a in [c ->:Owns:->] if not a.is_fd] if c is not None else [];
+    subject = mine[0] if mine else None;
     for kind in kinds {
         sig = Signal(
             kind=SignalKind(kind), subject_account=subject.id if subject is not None else "",

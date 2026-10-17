@@ -1,6 +1,7 @@
 # Shared helpers for the Phone Shield and the Bank Council agents (A)
 # Agents never call each other: they read the graph and write Proposal nodes on it.
 import time;
+import from operator { attrgetter }
 import from graph.nodes { RNode, Citizen, Habit, Account, Request, Proposal, PressureReading, Stance, Action }
 import from graph.edges { Has, HasProposal, Read }
 import from graph.queries { citizen_of, payee_of, add_timeline, now_s }
@@ -92,7 +93,7 @@ def proposals_of(target: RNode) -> list[Proposal] {
 }
 
 def proposal_of(target: RNode, agent: str) -> Proposal | None {
-    found = sorted([p for p in proposals_of(target) if p.agent == agent], key=lambda p: Proposal: p.at);
+    found = sorted([p for p in proposals_of(target) if p.agent == agent], key=attrgetter("at"));
     return found[-1] if found else None;
 }
 
@@ -124,7 +125,7 @@ def proposal_dict(p: Proposal) -> dict[str, any] {
 
 """Latest pressure reading of a request, or None."""
 def latest_pressure(req: Request) -> PressureReading | None {
-    found = sorted([req ->:Read:->], key=lambda r: PressureReading: r.at);
+    found = sorted([req ->:Read:->], key=attrgetter("at"));
     return found[-1] if found else None;
 }
 
