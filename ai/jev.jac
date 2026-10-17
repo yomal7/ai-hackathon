@@ -119,10 +119,10 @@ glob RISK_QUESTIONS: dict = {
 glob PRESSURE_QUESTIONS: dict = {
     "coached": {
         "type": "noul",
-        "instructions": "Looking ONLY at the live behaviour signals in telemetry right now, is someone guiding this person while they use the bank app?",
+        "instructions": "Looking ONLY at the live behaviour signals in telemetry right now, is someone on the phone guiding this person while they use the bank app?",
         "criteria": {
-            "true": "Live signs: on an active phone call, a remote-access app open, account number pasted, new payee, long hesitation (over 4000 ms), going back (backtracks), typing changed, or a reference like 'safe account' in any language.",
-            "false": "Not on a call, typing normally, no pasted account, no scam words. A large amount alone is NOT a sign of coaching."
+            "true": "STRONG signs: on an active phone call, a remote-access app open, or a reference like 'safe account' / police words in any language. Several weak signs together WITH a strong sign make it very likely.",
+            "false": "No strong sign. WEAK signs alone (long hesitation, going back, a pasted account number, a new payee, typing changed) are common for elderly people who are simply slow or careful, so alone they mean only mild pressure. A large amount alone is NOT a sign of coaching."
         }
     },
     "scam_type": {"type": "choice", "instructions": "Which scam does this look like? Say NONE if there are no scam signs.", "criteria": SCAM_TYPES}
